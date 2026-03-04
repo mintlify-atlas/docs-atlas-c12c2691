@@ -1,0 +1,466 @@
+---
+title: 'QR Code Tickets'
+description: 'Generate, scan, and verify QR code tickets for parking access'
+icon: 'qrcode'
+---
+
+## Overview
+
+The QR code system enables contactless parking access through scannable digital tickets. Each reservation generates a unique QR code that can be scanned for entry verification and downloaded as a PDF.
+
+## QR Code Generation
+
+QR codes are generated automatically when a reservation is confirmed:
+
+```typescript
+const reservationID = `${safeDate}_${displayTime}_Spot${selectedSpot}`;
+const qrDataEncoded = encodeURIComponent(reservationID);
+
+// Store in reservation document
+await transaction.set(reservationRef, {
+  customId: reservationID,
+  // ... other reservation data
+});
+```
+
+<Info>
+  The QR code contains the unique reservation ID, which includes the date, time, and spot number.
+</Info>
+
+## Ticket Modal
+
+The ticket modal displays the QR code with reservation details:
+
+```typescript
+import QRCode from 'react-native-qrcode-svg';
+
+<Modal visible={visible} animationType="slide" transparent>
+  <TouchableOpacity 
+    style={styles.modalOverlay} 
+    activeOpacity={1} 
+    onPress={onClose}
+  >
+    <TouchableWithoutFeedback>
+      <View style={styles.ticketCard}>
+        {/* Header */}
+        <View style={styles.ticketHeader}>
+          <View style={styles.ticketHoleLeft} />
+          <Text style={styles.ticketTitle}>COMPROBANTE</Text>
+          <View style={styles.ticketHoleRight} />
+        </View>
+
+        <View style={styles.ticketBody}>
+          {/* QR Code */}
+          <View style={styles.qrContainer}>
+            <QRCode value={reservation.id} size={140} />
+            <Text style={styles.qrText}>
+              Escanea este código en la entrada
+            </Text>
+          </View>
+
+          {/* Reservation Details */}
+          <Text style={styles.ticketLabel}>ID RESERVA</Text>
+          <Text style={styles.ticketValueSmall}>{reservation.id}</Text>
+
+          <View style={styles.dividerDashed} />
+
+          {/* Date and Time */}
+          <View style={styles.rowBetween}>
+            <View>
+              <Text style={styles.ticketLabel}>FECHA</Text>
+              <Text style={styles.ticketValue}>{reservation.date}</Text>
+            </View>
+            <View>
+              <Text style={styles.ticketLabel}>HORA</Text>
+              <Text style={styles.ticketValue}>{reservation.time}</Text>
+            </View>
+          </View>
+
+          {/* Spot and Plate */}
+          <View style={[styles.rowBetween, { marginTop: 15 }]}>
+            <View>
+              <Text style={styles.ticketLabel}>LUGAR</Text>
+              <Text style={styles.ticketValue}>{reservation.spotId}</Text>
+            </View>
+            <View>
+              <Text style={styles.ticketLabel}>PLACA</Text>
+              <Text style={styles.ticketValue}>{reservation.vehiclePlate}</Text>
+            </View>
+          </View>
+        </View>
+      </View>
+    </TouchableWithoutFeedback>
+  </TouchableOpacity>
+</Modal>
+```
+
+## Ticket Design Elements
+
+<AccordionGroup>
+  <Accordion title="Header with Perforations">
+    The ticket header mimics physical tickets with decorative holes:
+    ```typescript
+    ticketHoleLeft: { 
+      position: 'absolute', 
+      left: -10, 
+      top: 20, 
+      width: 20, 
+      height: 20, 
+      borderRadius: 10, 
+      backgroundColor: 'rgba(0,0,0,0.5)' 
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Dashed Dividers">
+    Sections are separated with dashed borders:
+    ```typescript
+    dividerDashed: { 
+      height: 1, 
+      borderWidth: 1, 
+      borderColor: '#DDD', 
+      borderStyle: 'dashed', 
+      borderRadius: 1, 
+      marginVertical: 15 
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Monospace ID">
+    Reservation IDs use monospace fonts for clarity:
+    ```typescript
+    ticketValueSmall: { 
+      fontSize: 12, 
+      color: '#333', 
+      fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace' 
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## PDF Generation
+
+Users can download tickets as PDF documents:
+
+```typescript
+import * as Print from 'expo-print';
+import * as Sharing from 'expo-sharing';
+
+const handlePrint = async () => {
+  const item = reservation;
+  
+  const htmlContent = `
+  <!DOCTYPE html>
+  <html>
+    <head>
+      <meta charset="utf-8">
+      <style>
+        body { 
+          font-family: 'Roboto', sans-serif; 
+          background-color: #f0f0f0; 
+          padding: 40px; 
+          display: flex; 
+          justify-content: center; 
+        }
+        .ticket-container { 
+          width: 100%; 
+          max-width: 380px; 
+          background-color: white; 
+          border-radius: 20px; 
+          overflow: hidden; 
+          border: 1px solid #ddd; 
+        }
+        .header { 
+          background-color: #FFE100; 
+          padding: 30px 20px; 
+          text-align: center; 
+          border-bottom: 2px dashed #333; 
+        }
+        .qr-box { 
+          text-align: center; 
+          margin-bottom: 25px; 
+        }
+        .qr-img { 
+          width: 180px; 
+          height: 180px; 
+        }
+        .row { 
+          display: flex; 
+          justify-content: space-between; 
+          margin-bottom: 15px; 
+        }
+      </style>
+    </head>
+    <body>
+      <div class="ticket-container">
+        <div class="header">
+          <div class="brand">PARKINMX</div>
+          <div class="subtitle">Ticket de Acceso Digital</div>
+        </div>
+        <div class="body">
+          <div class="qr-box">
+            <img src="https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${item.id}" 
+                 class="qr-img" />
+          </div>
+          <div class="row">
+            <div class="col">
+              <span class="label">Fecha</span>
+              <span class="value">${item.date}</span>
+            </div>
+            <div class="col">
+              <span class="label">Hora</span>
+              <span class="value">${item.time}</span>
+            </div>
+          </div>
+          <div class="row">
+            <div class="col">
+              <span class="label">Lugar</span>
+              <span class="value">${item.spotId}</span>
+            </div>
+            <div class="col">
+              <span class="label">Placa</span>
+              <span class="value">${item.vehiclePlate}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </body>
+  </html>
+  `;
+
+  try {
+    const { uri } = await Print.printToFileAsync({ html: htmlContent });
+    await Sharing.shareAsync(uri, { 
+      UTI: '.pdf', 
+      mimeType: 'application/pdf' 
+    });
+  } catch (error) {
+    console.error("Error generating PDF:", error);
+  }
+};
+```
+
+<Tip>
+  PDFs use an external QR code API service for reliable rendering across all platforms.
+</Tip>
+
+## QR Code Scanning
+
+Users can scan QR codes to add friends or verify tickets:
+
+```typescript
+import { CameraView, useCameraPermissions } from 'expo-camera';
+
+export const ScannerModal = ({ visible, onClose, onScanned }: Props) => {
+  const [permission, requestPermission] = useCameraPermissions();
+  const [scanned, setScanned] = useState(false);
+
+  useEffect(() => {
+    if (visible) {
+      setScanned(false);
+      if (!permission?.granted) requestPermission();
+    }
+  }, [visible]);
+
+  const handleBarCodeScanned = ({ data }: { data: string }) => {
+    if (scanned) return;
+    
+    // Verify it's a ParkIn QR code
+    if (data.startsWith('parkinmx:')) {
+      setScanned(true);
+      const userId = data.split(':')[1];
+      onScanned(userId);
+      onClose();
+    }
+  };
+
+  return (
+    <Modal animationType="slide" visible={visible}>
+      <View style={styles.container}>
+        <CameraView
+          style={StyleSheet.absoluteFillObject}
+          facing="back"
+          onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
+        />
+        
+        {/* Overlay with cutout */}
+        <View style={styles.overlay}>
+          <View style={styles.topOverlay}>
+            <Text style={styles.text}>Escanea el QR de tu amigo</Text>
+          </View>
+          <View style={styles.middleRow}>
+            <View style={styles.sideOverlay} />
+            <View style={styles.cutout} />
+            <View style={styles.sideOverlay} />
+          </View>
+          <View style={styles.bottomOverlay}>
+            <TouchableOpacity style={styles.closeBtn} onPress={onClose}>
+              <Ionicons name="close" size={30} color="#FFF" />
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+};
+```
+
+### Scanner Overlay Design
+
+```typescript
+const styles = StyleSheet.create({
+  overlay: { flex: 1 },
+  topOverlay: { 
+    flex: 1, 
+    backgroundColor: 'rgba(0,0,0,0.6)', 
+    justifyContent: 'center', 
+    alignItems: 'center' 
+  },
+  middleRow: { 
+    flexDirection: 'row', 
+    height: 250 
+  },
+  sideOverlay: { 
+    flex: 1, 
+    backgroundColor: 'rgba(0,0,0,0.6)' 
+  },
+  cutout: { 
+    width: 250, 
+    borderColor: '#FFE100', 
+    borderWidth: 2, 
+    backgroundColor: 'transparent' 
+  },
+});
+```
+
+<Card title="Camera Permissions" icon="camera">
+  The scanner automatically requests camera permissions when opened. If denied, users are prompted to enable them in system settings.
+</Card>
+
+## Personal QR Codes
+
+Users can display their personal QR code for friend connections:
+
+```typescript
+export const MyQRModal = ({ visible, onClose, userId, userName }: Props) => {
+  const qrValue = `parkinmx:${userId}`;
+
+  return (
+    <Modal animationType="slide" transparent={true} visible={visible}>
+      <View style={styles.overlay}>
+        <View style={styles.card}>
+          <View style={styles.header}>
+            <Text style={styles.title}>Tu Tarjeta de ParkIn</Text>
+            <TouchableOpacity onPress={onClose}>
+              <Ionicons name="close" size={24} color="#000" />
+            </TouchableOpacity>
+          </View>
+
+          <Text style={styles.subtitle}>
+            Muestra este código a un amigo para que te agregue.
+          </Text>
+
+          <View style={styles.qrContainer}>
+            <QRCode value={qrValue} size={200} />
+            <View style={styles.avatarContainer}>
+              <Ionicons name="car-sport" size={30} color="#000" />
+            </View>
+          </View>
+
+          <Text style={styles.userName}>@{userName}</Text>
+          <Text style={styles.uid}>ID: {userId.slice(0, 8)}...</Text>
+
+          <TouchableOpacity style={styles.btn} onPress={onClose}>
+            <Text style={styles.btnText}>Cerrar</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
+};
+```
+
+<Info>
+  Personal QR codes use the format `parkinmx:userId` to differentiate them from reservation tickets.
+</Info>
+
+## Email Integration
+
+Tickets are automatically sent via email after reservation:
+
+```typescript
+await emailjs.send(
+  EMAILJS_SERVICE_ID, 
+  EMAILJS_TEMPLATE_ID, 
+  {
+    to_email: userEmail,
+    to_name: userName,
+    view_ticket: "block",
+    view_msg: "none",
+    reservation_id: reservationID,
+    qr_data: qrDataEncoded,
+    date: displayDate,
+    time: displayTime,
+    spot: selectedSpot,
+    plate: selectedVehicle.plate
+  },
+  { publicKey: EMAILJS_PUBLIC_KEY }
+);
+```
+
+<Check>
+  Email templates include embedded QR codes for offline access to tickets.
+</Check>
+
+## QR Code Libraries
+
+The app uses multiple QR libraries for different purposes:
+
+<CardGroup cols={2}>
+  <Card title="react-native-qrcode-svg" icon="mobile">
+    **In-App Display**  
+    Vector-based rendering for crisp QR codes in the app
+  </Card>
+  <Card title="QR Server API" icon="server">
+    **PDF Generation**  
+    External API for reliable QR codes in PDF documents
+  </Card>
+</CardGroup>
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Unique Identifiers">
+    Always use unique, non-guessable reservation IDs:
+    ```typescript
+    const reservationID = `${date}_${time}_Spot${spotId}`;
+    ```
+  </Accordion>
+  
+  <Accordion title="URL Encoding">
+    Encode QR data for email transmission:
+    ```typescript
+    const qrDataEncoded = encodeURIComponent(reservationID);
+    ```
+  </Accordion>
+  
+  <Accordion title="Scan Validation">
+    Always verify QR codes belong to your app:
+    ```typescript
+    if (data.startsWith('parkinmx:')) {
+      // Valid code
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Security Considerations
+
+<Warning>
+  QR codes should be validated server-side before granting access. The app-side scan is only for user convenience.
+</Warning>
+
+- Reservation IDs include timestamps to prevent reuse
+- Server validates reservation status before entry
+- QR codes expire after reservation window
+- Duplicate scans are logged and flagged

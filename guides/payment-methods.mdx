@@ -1,0 +1,484 @@
+---
+title: 'Payment Methods'
+description: 'Managing payment cards, wallet balance, and auto-reload'
+icon: 'wallet'
+---
+
+## Overview
+
+PARKINMX uses a credit-based wallet system. You purchase credits with real money, and credits are deducted when you complete parking sessions. This guide covers managing payment cards, recharging your balance, and understanding the credit system.
+
+## Understanding the Credit System
+
+### How Credits Work
+
+<Steps>
+  <Step title="Purchase Credits">
+    You buy credits by recharging your wallet with MXN (Mexican Pesos) through Mercado Pago
+  </Step>
+  
+  <Step title="Credits Stored in Wallet">
+    All credits are stored in your account balance and shared across all your cards
+  </Step>
+  
+  <Step title="Credits Deducted on Use">
+    When you complete a parking session, credits are automatically deducted based on time parked
+  </Step>
+</Steps>
+
+### Conversion Rate
+
+```typescript Source Reference
+let creditos = dinero * 6;
+if (creditos >= 100) creditos += 20; // Bonus for large recharges
+```
+
+**Conversion Formula:**
+- **$1 MXN = 6 credits**
+- **Bonus:** Recharges ≥ 100 credits get **+20 bonus credits**
+
+**Examples:**
+- $30 MXN = 180 credits
+- $50 MXN = 300 credits (includes +20 bonus) ✨
+- $100 MXN = 600 credits (includes +20 bonus) ✨
+
+<Tip>
+Recharge $50 or more to receive the +20 credit bonus!
+</Tip>
+
+### Minimum Balance Requirement
+
+You need at least **120 credits** to make a reservation. This ensures you can complete a typical parking session.
+
+```typescript Source Reference
+const SALDO_MINIMO = 120; // Minimum 120 credits required
+
+if (currentCredits < SALDO_MINIMO) { 
+  Alert.alert("Saldo Insuficiente"); 
+  return; 
+}
+```
+
+## Managing Payment Cards
+
+### Card Types
+
+PARKINMX supports two types of cards:
+
+<CardGroup cols={2}>
+  <Card title="Titular Card" icon="credit-card">
+    **Primary Card** - Black design
+    
+    Your main account card. Created automatically when you add your first card.
+  </Card>
+  
+  <Card title="Additional Cards" icon="credit-card-front">
+    **Secondary Cards** - Yellow design
+    
+    Extra cards for family members or different purposes. Up to 5 total cards allowed.
+  </Card>
+</CardGroup>
+
+### Accessing Your Cards
+
+From the main menu:
+1. Tap **"Mis Tarjetas"**
+2. Swipe horizontally to view all your cards
+3. First card is always your Titular (primary) card
+
+## Adding a New Payment Card
+
+<Note>
+**Security Note:** Card generation uses a secure 2-factor authentication process (NIP + Email verification).
+</Note>
+
+<Steps>
+  <Step title="Initiate Card Request">
+    Swipe to the end of your cards and tap the **"+ Solicitar Nueva Tarjeta"** card
+  </Step>
+  
+  <Step title="Enter Security NIP">
+    A keypad appears. Enter your 4-digit security NIP
+  </Step>
+  
+  <Step title="Verify Email Code">
+    Check your email for a 4-digit verification code and enter it
+  </Step>
+  
+  <Step title="Fill Card Details">
+    Enter the cardholder's full name and optional card alias
+  </Step>
+  
+  <Step title="Generate Card">
+    Tap **"Generar Tarjeta"**. Card number and expiry are auto-generated
+  </Step>
+</Steps>
+
+### Step 1: Security NIP Validation
+
+```typescript Source Reference
+const handleValidateNip = (enteredNip: string) => {
+  if (enteredNip === storedNip) sendVerificationEmail();
+  else { 
+    Alert.alert("Error", "NIP Incorrecto."); 
+    setInputNip(['', '', '', '']); 
+  }
+};
+```
+
+<Warning>
+Your NIP must match the one configured in your profile. If you've forgotten your NIP, go to Settings > Security to reset it.
+</Warning>
+
+### Step 2: Email Verification
+
+A 4-digit code is sent to your registered email:
+
+```typescript Source Reference
+const code = Math.floor(1000 + Math.random() * 9000).toString();
+
+await emailjs.send(
+  EMAILJS_SERVICE_ID, 
+  EMAILJS_TEMPLATE_ID,
+  { 
+    to_email: userEmail, 
+    to_name: userName, 
+    message: code,
+    view_ticket: "none",
+    view_msg: "block"
+  },
+  { publicKey: EMAILJS_PUBLIC_KEY }
+);
+```
+
+<Tip>
+**Can't find the email?**
+- Check your spam/junk folder
+- Wait up to 2 minutes for delivery
+- Ensure your email is correctly registered
+</Tip>
+
+### Step 3: Card Information Form
+
+<ParamField path="holderName" type="string" required>
+  **Cardholder Full Name**
+  
+  The name that will appear on the card.
+  
+  **Example:** `"Juan Pérez"`
+</ParamField>
+
+<ParamField path="alias" type="string">
+  **Card Alias (Optional)**
+  
+  A nickname to identify this card.
+  
+  **Examples:** `"Gastos Casa"`, `"Tarjeta Familiar"`, `"Emergencias"`
+  
+  **Default:** First card = "Tarjeta Titular", Additional cards = "Tarjeta Familiar"
+</ParamField>
+
+### Auto-Generated Card Data
+
+The system automatically generates:
+
+```typescript Source Reference
+const type = Math.random() > 0.5 ? "Visa" : "Mastercard";
+
+let randomNum = '';
+for(let i=0; i<16; i++) randomNum += Math.floor(Math.random() * 10);
+
+const randomMonth = String(Math.floor(Math.random() * 12) + 1).padStart(2, '0');
+const randomYear = String(new Date().getFullYear() + Math.floor(Math.random() * 4) + 2).slice(-2);
+const randomExpiry = `${randomMonth}/${randomYear}`;
+
+const newCard = {
+  holderName: cardName,
+  alias: cardAlias || (isFirstCard ? "Tarjeta Titular" : "Tarjeta Familiar"),
+  last4: randomNum.slice(-4),
+  fullNumberSimulated: randomNum,
+  expiry: randomExpiry,
+  type: type,
+  isPrimary: isFirstCard
+};
+```
+
+**Generated Fields:**
+- **Card Type**: Randomly assigned (Visa or Mastercard)
+- **Card Number**: 16-digit random number
+- **Expiration Date**: Random date 2-6 years in the future
+- **Last 4 Digits**: Extracted from the full number
+
+## Card Limits
+
+<Warning>
+**Maximum 5 Cards**: You can register up to 5 payment cards per account.
+
+```typescript Source Reference
+if (cards.length >= 5) {
+  Alert.alert("Límite Alcanzado", "Solo puedes tener 5 tarjetas.");
+  return;
+}
+```
+</Warning>
+
+## Deleting a Payment Card
+
+<Steps>
+  <Step title="Locate Card">
+    Swipe through your cards to find the one you want to remove
+  </Step>
+  
+  <Step title="Tap Trash Icon">
+    Tap the trash icon in the bottom-right corner of the card
+  </Step>
+  
+  <Step title="Confirm Deletion">
+    Confirm the deletion in the alert dialog
+  </Step>
+</Steps>
+
+```typescript Source Reference
+const handleDeleteCard = (id: string) => {
+  Alert.alert("Eliminar", "¿Borrar esta tarjeta?", [
+    { text: "Cancelar" },
+    { text: "Eliminar", style: 'destructive', onPress: async () => {
+      await deleteDoc(doc(db, "cards", id));
+      fetchData();
+    }}
+  ]);
+}
+```
+
+<Warning>
+**Cannot Delete Primary Card**: The Titular (primary) card cannot be deleted if it's your only card. You must have at least one active payment method.
+</Warning>
+
+## Recharging Your Balance
+
+### Accessing Recharge Screen
+
+From the main menu:
+1. Tap **"Recargar Saldo"**
+2. View your current balance at the top
+3. Enter recharge amount
+4. Complete payment via Mercado Pago
+
+### Current Balance Display
+
+The balance card shows:
+
+```typescript Source Reference
+<View style={styles.balanceCard}>
+  <Text style={styles.balanceLabel}>SALDO DISPONIBLE</Text>
+  <Text style={styles.balanceAmount}>{saldoCreditos}</Text>
+  <Text style={styles.balanceUnit}>CRÉDITOS</Text>
+  
+  <Text style={styles.cardText}>
+    Vinculado a Tarjeta Titular •••• {tarjetaTitular || '----'}
+  </Text>
+  <Text style={styles.cardSubText}>
+    Este saldo se comparte con todas tus tarjetas asociadas.
+  </Text>
+</View>
+```
+
+**Displays:**
+- Current credit balance (large number)
+- Linked primary card (last 4 digits)
+- Note that balance is shared across all cards
+
+### Recharge Process
+
+<Steps>
+  <Step title="Enter Amount">
+    Type the amount in MXN you want to recharge (minimum $30)
+  </Step>
+  
+  <Step title="View Credit Preview">
+    See how many credits you'll receive with the conversion rate and bonus
+  </Step>
+  
+  <Step title="Tap Pay Button">
+    Tap **"PAGAR CON MERCADO PAGO"** button
+  </Step>
+  
+  <Step title="Complete Payment">
+    You'll be redirected to Mercado Pago to complete the transaction
+  </Step>
+  
+  <Step title="Receive Credits">
+    Credits are added to your account automatically upon payment confirmation
+  </Step>
+</Steps>
+
+### Quick Amount Buttons
+
+Tap preset amounts for faster recharging:
+
+```typescript Source Reference
+<View style={styles.quickButtonsRow}>
+  {[30, 50, 100].map((val) => (
+    <TouchableOpacity 
+      key={val} 
+      style={styles.quickBtn} 
+      onPress={() => setMonto(val.toString())}
+    >
+      <Text style={styles.quickBtnText}>${val}</Text>
+    </TouchableOpacity>
+  ))}
+</View>
+```
+
+**Available Presets:**
+- $30 MXN → 180 credits
+- $50 MXN → 320 credits (+ bonus)
+- $100 MXN → 620 credits (+ bonus)
+
+### Credit Preview Calculator
+
+As you type an amount, see the exact credits you'll receive:
+
+```typescript Source Reference
+const dinero = parseFloat(monto);
+let creditos = dinero * 6;
+if (creditos >= 100) creditos += 20; // Bonus applied
+setCreditosPreview(Math.floor(creditos));
+```
+
+### Mercado Pago Integration
+
+Payment is processed through Mercado Pago:
+
+```typescript Source Reference
+const crearPreferencia = httpsCallable(functions, 'crearPreferenciaMP');
+
+const resultado: any = await crearPreferencia({ 
+  monto: dinero,
+  uid: usuarioFresco.uid 
+});
+
+const datos = resultado.data;
+const urlPago = datos.url;
+
+if (urlPago) {
+  Linking.openURL(urlPago); // Opens Mercado Pago payment page
+}
+```
+
+<Note>
+Mercado Pago is a secure payment platform. Your payment information is never stored in PARKINMX servers.
+</Note>
+
+## Minimum Recharge Amount
+
+```typescript Source Reference
+if (isNaN(dinero) || dinero < 30) {
+  Alert.alert("Monto Inválido", "La recarga mínima es de $30.00 MXN");
+  return;
+}
+```
+
+**Minimum:** $30.00 MXN
+
+<Warning>
+Amounts below $30 MXN are not accepted. The pay button will be disabled if you enter less than the minimum.
+</Warning>
+
+## Real-Time Balance Updates
+
+Your balance updates automatically using Firestore listeners:
+
+```typescript Source Reference
+useEffect(() => {
+  if (!user) return;
+  const unsub = onSnapshot(doc(db, 'users', user.uid), (docSnap) => {
+    if (docSnap.exists()) {
+      setSaldoCreditos(docSnap.data().credits_balance || 0);
+    }
+  });
+  return () => unsub();
+}, [user]);
+```
+
+Whenever credits are added or deducted, the change reflects immediately in the UI.
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Payment Not Processing">
+    **Issue:** Stuck on loading after tapping pay button
+    
+    **Solution:**
+    - Ensure you have a stable internet connection
+    - Check that your session is active (not logged out)
+    - Try refreshing the app
+    - Contact support if the issue persists
+  </Accordion>
+
+  <Accordion title="Credits Not Added After Payment">
+    **Issue:** Paid via Mercado Pago but credits didn't arrive
+    
+    **Solution:**
+    - Wait 5-10 minutes for payment confirmation
+    - Check your Mercado Pago receipt for payment status
+    - Pull down to refresh your balance
+    - Contact support with your payment receipt
+  </Accordion>
+
+  <Accordion title="Cannot Generate New Card">
+    **Error:** "Límite Alcanzado - Solo puedes tener 5 tarjetas"
+    
+    **Solution:** Delete an unused card before adding a new one. You can have a maximum of 5 cards.
+  </Accordion>
+
+  <Accordion title="Email Verification Code Not Received">
+    **Issue:** No code in inbox when adding card
+    
+    **Solution:**
+    - Check spam/junk folder
+    - Verify your email is correct in profile settings
+    - Wait 2 minutes and check again
+    - Cancel and restart the card addition process
+  </Accordion>
+
+  <Accordion title="Bonus Credits Not Applied">
+    **Issue:** Recharged but didn't receive +20 bonus
+    
+    **Solution:** The bonus only applies when the credit amount (before bonus) is ≥ 100 credits. This means recharges of $17 MXN or more qualify for the bonus.
+  </Accordion>
+</AccordionGroup>
+
+## Best Practices
+
+<Tip>
+**Keep a Healthy Balance**: Maintain at least 200-300 credits to cover multiple parking sessions without needing frequent recharges.
+</Tip>
+
+<Tip>
+**Use Card Aliases**: Give your cards descriptive names like "Personal", "Trabajo", or "Familia" to easily identify them.
+</Tip>
+
+<Tip>
+**Monitor Your Spending**: Check your [History](/guides/history-tracking) regularly to see how many credits you're using per session.
+</Tip>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Make a Reservation" icon="calendar-check" href="/guides/making-reservation">
+    Use your credits to book parking spots
+  </Card>
+  
+  <Card title="View History" icon="clock-rotate-left" href="/guides/history-tracking">
+    Track your credit usage and past charges
+  </Card>
+  
+  <Card title="Manage Vehicles" icon="car" href="/guides/managing-vehicles">
+    Add vehicles to use with your payment cards
+  </Card>
+  
+  <Card title="Get Support" icon="headset" href="/guides/support-chat">
+    Contact support for payment issues
+  </Card>
+</CardGroup>

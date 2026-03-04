@@ -1,0 +1,421 @@
+---
+title: 'Vehicle Management'
+description: 'Add, edit, and manage vehicles for parking reservations'
+icon: 'car'
+---
+
+## Overview
+
+The vehicle management system allows users to register and manage multiple vehicles for use in parking reservations. Each vehicle includes details like brand, model, color, and license plate.
+
+## Vehicle Registration
+
+### Required Fields
+
+<CardGroup cols={2}>
+  <Card title="License Plate" icon="credit-card">
+    **Required** - Unique identifier for the vehicle
+  </Card>
+  <Card title="Brand" icon="car">
+    **Required** - Vehicle manufacturer (e.g., Toyota, Honda)
+  </Card>
+  <Card title="Model" icon="tag">
+    Optional - Specific model name (e.g., Corolla, Civic)
+  </Card>
+  <Card title="Color" icon="palette">
+    Optional - Vehicle color for easy identification
+  </Card>
+  <Card title="Alias" icon="bookmark">
+    Optional - Custom nickname (e.g., "Auto de Papá")
+  </Card>
+</CardGroup>
+
+### Adding a Vehicle
+
+```typescript
+const handleAddVehicle = async () => {
+  // Validation
+  if (!newPlate.trim() || !newBrand.trim()) {
+    Alert.alert(
+      "Falta información", 
+      "La Placa y la Marca son obligatorias."
+    );
+    return;
+  }
+
+  setSaving(true);
+  
+  try {
+    await addDoc(collection(db, "vehicles"), {
+      userId: auth.currentUser?.uid,
+      alias: newAlias || `${newBrand} ${newModel}`,
+      plate: newPlate.toUpperCase().replace(/\s/g, ''),
+      brand: newBrand.trim(),
+      model: newModel.trim(),
+      color: newColor.trim(),
+      createdAt: new Date()
+    });
+
+    setModalVisible(false);
+    fetchVehicles();
+    Alert.alert("¡Listo!", "Vehículo agregado correctamente.");
+  } catch (error) {
+    Alert.alert("Error", "No se pudo guardar el vehículo.");
+  } finally {
+    setSaving(false);
+  }
+};
+```
+
+<Note>
+  License plates are automatically converted to uppercase and spaces are removed for consistency.
+</Note>
+
+## Vehicle Form
+
+The add vehicle form provides a clean interface:
+
+```typescript
+<Modal visible={modalVisible} animationType="slide" transparent={true}>
+  <KeyboardAvoidingView 
+    behavior={Platform.OS === 'ios' ? 'padding' : 'height'} 
+    style={styles.modalOverlay}
+  >
+    <View style={styles.modalContent}>
+      <Text style={styles.modalTitle}>Agregar Auto</Text>
+      
+      <ScrollView showsVerticalScrollIndicator={false}>
+        {/* Alias */}
+        <Text style={styles.label}>Apodo (Opcional)</Text>
+        <TextInput 
+          style={styles.input} 
+          placeholder="Ej. El Rojo, Auto de Papá..." 
+          value={newAlias}
+          onChangeText={setNewAlias}
+        />
+
+        {/* Brand and Model */}
+        <View style={styles.row}>
+          <View style={{ flex: 1, marginRight: 10 }}>
+            <Text style={styles.label}>Marca *</Text>
+            <TextInput 
+              style={styles.input} 
+              placeholder="Toyota" 
+              value={newBrand}
+              onChangeText={setNewBrand}
+            />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.label}>Modelo</Text>
+            <TextInput 
+              style={styles.input} 
+              placeholder="Corolla" 
+              value={newModel}
+              onChangeText={setNewModel}
+            />
+          </View>
+        </View>
+
+        {/* Color and Plate */}
+        <View style={styles.row}>
+          <View style={{ flex: 1, marginRight: 10 }}>
+            <Text style={styles.label}>Color</Text>
+            <TextInput 
+              style={styles.input} 
+              placeholder="Gris" 
+              value={newColor}
+              onChangeText={setNewColor}
+            />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.label}>Placa / Matrícula *</Text>
+            <TextInput 
+              style={[styles.input, styles.plateInput]} 
+              placeholder="ABC-123" 
+              value={newPlate}
+              onChangeText={setNewPlate}
+              autoCapitalize="characters"
+            />
+          </View>
+        </View>
+      </ScrollView>
+
+      {/* Action Buttons */}
+      <View style={styles.modalButtons}>
+        <TouchableOpacity 
+          style={styles.cancelButton} 
+          onPress={() => setModalVisible(false)}
+        >
+          <Text style={styles.cancelText}>Cancelar</Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity 
+          style={styles.saveButton} 
+          onPress={handleAddVehicle} 
+          disabled={saving}
+        >
+          {saving ? (
+            <ActivityIndicator color="#000" />
+          ) : (
+            <Text style={styles.saveText}>Guardar Auto</Text>
+          )}
+        </TouchableOpacity>
+      </View>
+    </View>
+  </KeyboardAvoidingView>
+</Modal>
+```
+
+## Vehicle Display
+
+Vehicles are displayed in a card-based list:
+
+```typescript
+const renderItem = ({ item }: any) => (
+  <View style={styles.card}>
+    <View style={styles.cardIcon}>
+      <Ionicons name="car-sport" size={32} color="#000" />
+    </View>
+    
+    <View style={styles.cardInfo}>
+      <Text style={styles.carAlias}>{item.alias}</Text>
+      
+      <Text style={styles.carDetails}>
+        {item.brand} {item.model} {item.color ? `• ${item.color}` : ''}
+      </Text>
+
+      <View style={styles.plateContainer}>
+        <Text style={styles.carPlate}>{item.plate}</Text>
+      </View>
+    </View>
+
+    <TouchableOpacity 
+      onPress={() => handleDelete(item.id)} 
+      style={styles.deleteBtn}
+    >
+      <Ionicons name="trash-outline" size={22} color="#D93025" />
+    </TouchableOpacity>
+  </View>
+);
+```
+
+### Card Design Features
+
+<AccordionGroup>
+  <Accordion title="Icon Badge">
+    Yellow circular badge with car icon for visual consistency:
+    ```typescript
+    cardIcon: { 
+      width: 55, height: 55, 
+      borderRadius: 27.5, 
+      backgroundColor: '#FFE100', 
+      justifyContent: 'center', 
+      alignItems: 'center', 
+      borderWidth: 2, 
+      borderColor: '#000', 
+      borderStyle: 'dashed'
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="License Plate Badge">
+    Styled container mimicking real license plates:
+    ```typescript
+    plateContainer: { 
+      backgroundColor: '#F0F0F0', 
+      alignSelf: 'flex-start', 
+      paddingHorizontal: 10, 
+      paddingVertical: 4, 
+      borderRadius: 6, 
+      borderWidth: 1, 
+      borderColor: '#DDD' 
+    },
+    carPlate: { 
+      fontSize: 12, 
+      fontWeight: '900', 
+      color: '#333', 
+      letterSpacing: 1 
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Loading Vehicles
+
+Vehicles are fetched from Firebase on mount:
+
+```typescript
+const fetchVehicles = async () => {
+  if (!auth.currentUser) return;
+  
+  setLoading(true);
+  
+  try {
+    const q = query(
+      collection(db, "vehicles"), 
+      where("userId", "==", auth.currentUser.uid)
+    );
+    
+    const querySnapshot = await getDocs(q);
+    const cars: any[] = [];
+    
+    querySnapshot.forEach((doc) => {
+      cars.push({ id: doc.id, ...doc.data() });
+    });
+    
+    setVehicles(cars);
+  } catch (error) {
+    Alert.alert("Error", "No se pudieron cargar tus vehículos.");
+  } finally {
+    setLoading(false);
+  }
+};
+
+useEffect(() => {
+  fetchVehicles();
+}, []);
+```
+
+## Deleting Vehicles
+
+Users can remove vehicles with confirmation:
+
+```typescript
+const handleDelete = (id: string) => {
+  Alert.alert(
+    "Eliminar Vehículo",
+    "¿Estás seguro de eliminar este auto?",
+    [
+      { text: "Cancelar", style: "cancel" },
+      { 
+        text: "Eliminar", 
+        style: "destructive", 
+        onPress: async () => {
+          await deleteDoc(doc(db, "vehicles", id));
+          fetchVehicles();
+        }
+      }
+    ]
+  );
+};
+```
+
+<Warning>
+  Deleting a vehicle is permanent and cannot be undone. Ensure the vehicle is not associated with active reservations.
+</Warning>
+
+## Empty State
+
+When no vehicles are registered:
+
+```typescript
+<ListEmptyComponent>
+  <View style={styles.emptyContainer}>
+    <Ionicons name="car-outline" size={80} color="#DDD" />
+    <Text style={styles.emptyText}>Tu garaje está vacío</Text>
+    <Text style={styles.emptySubText}>
+      Agrega tu primer auto para comenzar.
+    </Text>
+  </View>
+</ListEmptyComponent>
+```
+
+## Floating Action Button
+
+A prominent FAB provides quick access to add vehicles:
+
+```typescript
+<TouchableOpacity 
+  style={styles.fab} 
+  onPress={() => setModalVisible(true)}
+>
+  <Ionicons name="add" size={32} color="#000" />
+</TouchableOpacity>
+```
+
+### FAB Styling
+
+```typescript
+fab: {
+  position: 'absolute',
+  bottom: 30,
+  right: 30,
+  width: 65,
+  height: 65,
+  borderRadius: 32.5,
+  backgroundColor: '#FFE100',
+  justifyContent: 'center',
+  alignItems: 'center',
+  shadowColor: "#000",
+  shadowOffset: { width: 0, height: 4 },
+  shadowOpacity: 0.3,
+  elevation: 8,
+  borderWidth: 2,
+  borderColor: '#000'
+}
+```
+
+<Tip>
+  The FAB remains visible while scrolling, ensuring users can always add a vehicle without scrolling back to the top.
+</Tip>
+
+## Vehicle Selection
+
+During reservation creation, users select from their vehicles:
+
+```typescript
+<TouchableOpacity 
+  style={styles.dropdown} 
+  onPress={() => setShowVehiclePicker(true)}
+>
+  <View>
+    <Text style={styles.inputLabelSmall}>Vehículo</Text>
+    <Text style={styles.inputValue}>
+      {selectedVehicle 
+        ? `${selectedVehicle.alias} • ${selectedVehicle.plate}` 
+        : "Seleccionar..."}
+    </Text>
+  </View>
+  <Ionicons name="car-outline" size={24} color="#666" />
+</TouchableOpacity>
+```
+
+## Data Structure
+
+```typescript
+interface Vehicle {
+  id: string;           // Firestore document ID
+  userId: string;       // Owner's Firebase UID
+  alias: string;        // Display name
+  plate: string;        // License plate (uppercase, no spaces)
+  brand: string;        // Manufacturer
+  model: string;        // Model name
+  color: string;        // Vehicle color
+  createdAt: Date;      // Registration timestamp
+}
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Plate Formatting">
+    Always normalize license plates:
+    - Convert to uppercase
+    - Remove all spaces
+    - Validate format if needed
+  </Accordion>
+  
+  <Accordion title="Auto-Generated Alias">
+    If user doesn't provide an alias, generate one from brand and model:
+    ```typescript
+    alias: newAlias || `${newBrand} ${newModel}`
+    ```
+  </Accordion>
+  
+  <Accordion title="User Isolation">
+    Always filter vehicles by userId to prevent data leaks:
+    ```typescript
+    where("userId", "==", auth.currentUser.uid)
+    ```
+  </Accordion>
+</AccordionGroup>

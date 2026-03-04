@@ -1,0 +1,297 @@
+---
+title: 'Making a Reservation'
+description: 'Step-by-step guide to reserve your parking spot'
+icon: 'calendar-check'
+---
+
+## Overview
+
+Reserving a parking spot in PARKINMX is a simple 4-step process. The system ensures you select an available spot, choose your vehicle and payment method, and confirm with a security verification code sent to your email.
+
+<Note>
+Reservations can be made up to 4 days in advance. The parking facility operates from 7:00 AM to 11:00 PM.
+</Note>
+
+## Before You Start
+
+Make sure you have:
+- At least **120 credits** in your account balance
+- At least one registered vehicle in your garage
+- At least one payment card registered
+- Access to your email for verification codes
+
+<Tip>
+Need to add a vehicle or payment method? Check out [Managing Vehicles](/guides/managing-vehicles) and [Payment Methods](/guides/payment-methods) guides first.
+</Tip>
+
+## Step 1: Select Date and Time
+
+From the main screen, tap **"Nueva Reserva"** to start the reservation process.
+
+### Choose Your Date
+
+1. Tap the **date input card** with the calendar icon
+2. A date picker will appear
+3. Select your desired parking date
+
+<Warning>
+**Date Restrictions:**
+- Cannot select past dates
+- Maximum 4 days in advance
+- Same-day reservations are allowed
+</Warning>
+
+### Choose Your Time
+
+1. Tap the **time input card** with the clock icon
+2. Select your arrival time
+3. Time must be between **7:00 AM - 11:00 PM**
+
+```typescript Source Reference
+// Operating hours validation
+const HORA_APERTURA = 7; 
+const HORA_CIERRE = 23;
+
+if (hour < HORA_APERTURA || hour >= HORA_CIERRE) {
+  Alert.alert("Cerrado", "Horario 7:00 AM - 11:00 PM");
+}
+```
+
+## Step 2: Select Your Parking Spot
+
+### Interactive Map View
+
+1. Tap the **"Cajón de Estacionamiento"** card
+2. An interactive parking map opens in full screen
+3. View all available and occupied spots
+   - **Green spots**: Available
+   - **Gray spots**: Occupied
+   - **Yellow highlight**: Your selection
+
+<Steps>
+  <Step title="Open the Map">
+    Tap the location card to view the full parking lot layout
+  </Step>
+  
+  <Step title="Select Your Spot">
+    Tap on any available green spot. The spot number will be highlighted
+  </Step>
+  
+  <Step title="Confirm Selection">
+    Tap **"Confirmar Lugar"** at the bottom to save your choice
+  </Step>
+</Steps>
+
+### Real-Time Availability
+
+The parking map updates in real-time. If a spot becomes occupied while you're viewing the map, it will automatically turn gray.
+
+```typescript Source Reference
+// Real-time occupied spots listener
+const q = query(
+  collection(db, "reservations"), 
+  where("status", "in", ["active", "pending"])
+);
+const unsubscribe = onSnapshot(q, (snapshot) => {
+  const occupied: string[] = [];
+  snapshot.forEach((doc) => { 
+    if (doc.data().spotId) occupied.push(doc.data().spotId.toString()); 
+  });
+  setOccupiedSpots(occupied);
+});
+```
+
+## Step 3: Select Vehicle and Payment Method
+
+### Choose Your Vehicle
+
+1. Tap the **"Vehículo"** dropdown
+2. A modal displays all your registered vehicles
+3. Select the vehicle you'll be parking
+4. Display shows: `Alias • License Plate`
+
+**Example:** "Mi Carro • ABC-1234"
+
+### Choose Payment Method
+
+1. Tap the **"Pago"** dropdown
+2. Select from your registered cards
+3. Display shows: `Card Alias (**** 1234)`
+
+<Note>
+Your selected payment card will be used to deduct the parking fee when your reservation is completed.
+</Note>
+
+## Step 4: Confirm with Security Verification
+
+### Enter Your Security NIP
+
+Once all details are filled:
+
+1. Tap **"Reservar Ahora"** button
+2. A security modal appears requesting your **4-digit NIP**
+3. Type your NIP using the on-screen input
+4. Tap **"CONTINUAR"**
+
+<Warning>
+Your NIP is validated against your profile. If incorrect, you'll need to try again. After 3 failed attempts, wait 5 minutes before retrying.
+</Warning>
+
+### Email Verification Code
+
+After NIP validation:
+
+1. A **4-digit verification code** is sent to your registered email
+2. Check your inbox (and spam folder)
+3. Enter the code in the verification modal
+4. Tap **"FINALIZAR"**
+
+```typescript Source Reference
+// Code generation and email sending
+const code = Math.floor(1000 + Math.random() * 9000).toString();
+setGeneratedCode(code);
+
+await emailjs.send(
+  EMAILJS_SERVICE_ID, 
+  EMAILJS_TEMPLATE_ID, 
+  { 
+    to_email: userEmail, 
+    to_name: userName, 
+    message: code,
+    // ... ticket data
+  }, 
+  { publicKey: EMAILJS_PUBLIC_KEY }
+);
+```
+
+### Reservation Created
+
+Upon successful verification:
+
+<Steps>
+  <Step title="Transaction Processed">
+    Your reservation is saved to the database with status **"pending"**
+  </Step>
+  
+  <Step title="Email Ticket Sent">
+    A confirmation email with your QR code ticket is sent to your inbox
+  </Step>
+  
+  <Step title="Notification Scheduled">
+    A reminder notification is scheduled for **15 minutes before** your reservation time
+  </Step>
+  
+  <Step title="Redirect to Home">
+    You're automatically returned to the home screen with a success message
+  </Step>
+</Steps>
+
+<Tip>
+The notification reminder will alert you: "⏳ Tu reserva está por iniciar - Faltan 15 min para tu reserva en el cajón [X]. ¡Prepara tu código QR!"
+</Tip>
+
+## Reservation Status Flow
+
+Your reservation goes through these states:
+
+<Accordion title="Pending">
+  Initial state when reservation is created. Spot is held for you but you haven't arrived yet.
+</Accordion>
+
+<Accordion title="Active">
+  Status changes to active when you scan your QR code at the entrance. Parking session begins.
+</Accordion>
+
+<Accordion title="Completed">
+  Status changes when you exit and scan your QR code again. Final charges are calculated.
+</Accordion>
+
+<Accordion title="Cancelled">
+  If you don't show up within 30 minutes of your reservation time, the system automatically cancels and applies a penalty.
+</Accordion>
+
+## Common Issues
+
+<AccordionGroup>
+  <Accordion title="Insufficient Balance Error">
+    **Error:** "Saldo Insuficiente"
+    
+    **Solution:** You need at least 120 credits to make a reservation. Go to [Payment Methods](/guides/payment-methods) to recharge your balance.
+  </Accordion>
+
+  <Accordion title="Spot Already Taken">
+    **Error:** "Lugar ocupado"
+    
+    **Solution:** The spot was reserved by another user while you were completing your reservation. Go back and select a different spot. The system uses Firestore transactions to prevent double-booking.
+  </Accordion>
+
+  <Accordion title="Email Code Not Received">
+    **Issue:** Verification code not in inbox
+    
+    **Solution:**
+    - Check your spam/junk folder
+    - Wait up to 2 minutes for delivery
+    - Ensure your email is correctly registered in your profile
+    - Try canceling and restarting the reservation
+  </Accordion>
+
+  <Accordion title="NIP Validation Failed">
+    **Error:** "NIP Incorrecto"
+    
+    **Solution:** Double-check your security NIP. If you've forgotten it, go to Settings > Security to reset your NIP.
+  </Accordion>
+</AccordionGroup>
+
+## Technical Details
+
+### Minimum Balance Requirement
+
+The system requires a minimum balance to ensure you can complete your parking session:
+
+```typescript Source Reference
+const SALDO_MINIMO = 120; // Minimum 120 credits required
+
+if (currentCredits < SALDO_MINIMO) { 
+  Alert.alert("Saldo Insuficiente"); 
+  return; 
+}
+```
+
+### Reservation ID Format
+
+Each reservation gets a unique ID for tracking:
+
+```typescript
+const safeDate = displayDate.replace(/\//g, '-'); 
+const reservationID = `${safeDate}_${displayTime}_Spot${selectedSpot}`;
+// Example: "04-03-2026_02:30PM_Spot12"
+```
+
+### QR Code Data
+
+Your ticket contains encoded reservation data:
+
+```typescript
+const qrDataEncoded = encodeURIComponent(reservationID);
+// This QR code is scanned at entrance/exit gates
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Track Your Reservations" icon="clock-rotate-left" href="/guides/history-tracking">
+    View your reservation history and receipts
+  </Card>
+  
+  <Card title="Manage Vehicles" icon="car" href="/guides/managing-vehicles">
+    Add or remove vehicles from your garage
+  </Card>
+  
+  <Card title="Payment Methods" icon="credit-card" href="/guides/payment-methods">
+    Recharge your balance and manage cards
+  </Card>
+  
+  <Card title="Get Support" icon="headset" href="/guides/support-chat">
+    Contact AI support if you need help
+  </Card>
+</CardGroup>

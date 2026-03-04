@@ -1,0 +1,284 @@
+---
+title: 'Interactive Parking Map'
+description: 'Real-time parking availability with interactive spot selection'
+icon: 'map-location-dot'
+---
+
+## Overview
+
+The interactive parking map provides a visual representation of 10 parking spots with real-time availability status. Users can select available spots directly from the map interface.
+
+## Map Layout
+
+The parking lot features a dual-column layout with 5 spots on each side:
+
+<CardGroup cols={2}>
+  <Card title="Left Column" icon="square-parking">
+    Spots 1-5 on the left side of the central lane
+  </Card>
+  <Card title="Right Column" icon="square-parking">
+    Spots 6-10 on the right side of the central lane
+  </Card>
+</CardGroup>
+
+## Spot Configuration
+
+```typescript
+const SPOTS_LAYOUT: Spot[] = [
+  // Left Column
+  { id: '1', x: 20, y: 20, label: '1' },
+  { id: '2', x: 20, y: 100, label: '2' },
+  { id: '3', x: 20, y: 180, label: '3' },
+  { id: '4', x: 20, y: 260, label: '4' },
+  { id: '5', x: 20, y: 340, label: '5' },
+
+  // Right Column
+  { id: '6', x: 190, y: 20, label: '6' },
+  { id: '7', x: 190, y: 100, label: '7' },
+  { id: '8', x: 190, y: 180, label: '8' },
+  { id: '9', x: 190, y: 260, label: '9' },
+  { id: '10', x: 190, y: 340, label: '10' },
+];
+```
+
+## Visual Indicators
+
+### Color Coding
+
+The map uses three colors to indicate spot status:
+
+<Steps>
+  <Step title="Green (#4CAF50)">
+    Available spots that can be selected for reservation
+  </Step>
+  <Step title="Red (#FF4444)">
+    Occupied spots with active or pending reservations
+  </Step>
+  <Step title="Yellow (#FFE100)">
+    Currently selected spot by the user
+  </Step>
+</Steps>
+
+```typescript
+const getSpotColor = (spotId: string, isOccupied: boolean) => {
+  if (selectedSpot === spotId) return '#FFE100'; // Yellow
+  if (isOccupied) return '#FF4444';              // Red
+  return '#4CAF50';                              // Green
+};
+```
+
+### Status Badges
+
+Occupied spots display a prohibition icon (⛔) to clearly indicate unavailability:
+
+```typescript
+{isOccupied && (
+  <SvgText 
+    x={spot.x + 60} 
+    y={spot.y + 20} 
+    fill="#FFF" 
+    fontSize="12" 
+    textAnchor="middle"
+  >
+    ⛔
+  </SvgText>
+)}
+```
+
+## Real-Time Updates
+
+The map receives real-time updates via Firebase listeners:
+
+```typescript
+interface ParkingMapProps {
+  selectedSpot: string | null;
+  onSelectSpot: (spotId: string) => void;
+  occupiedSpots: string[];  // Live data from Firebase
+}
+```
+
+<Info>
+  When another user books a spot, it immediately turns red for all other users viewing the map.
+</Info>
+
+## User Interactions
+
+### Selecting a Spot
+
+Users can tap any available (green) spot to select it:
+
+```typescript
+<G 
+  key={spot.id} 
+  onPress={() => {
+    if (!isOccupied) {
+      onSelectSpot(spot.id);
+    }
+  }}
+>
+  <Rect
+    x={spot.x}
+    y={spot.y}
+    width="70"
+    height="70"
+    rx="8"
+    fill={getSpotColor(spot.id, isOccupied)}
+    stroke="#FFF"
+    strokeWidth="2"
+  />
+  
+  <SvgText
+    x={spot.x + 35}
+    y={spot.y + 42}
+    fill={selectedSpot === spot.id ? '#000' : '#FFF'}
+    fontSize="24"
+    fontWeight="bold"
+  >
+    {spot.label}
+  </SvgText>
+</G>
+```
+
+<Warning>
+  Occupied spots are non-interactive. Taps on red spots are ignored to prevent selection errors.
+</Warning>
+
+### Android Touch Handling
+
+A transparent overlay ensures reliable touch detection across all devices:
+
+```typescript
+{/* Transparent touch area for Android compatibility */}
+<Rect
+  x={spot.x}
+  y={spot.y}
+  width="70"
+  height="70"
+  fill="transparent" 
+/>
+```
+
+## Map Design Elements
+
+<AccordionGroup>
+  <Accordion title="Central Lane">
+    A dashed white line runs down the center, simulating the parking lot drive lane:
+    
+    ```typescript
+    <Rect 
+      x="138" 
+      y="10" 
+      width="4" 
+      height="420" 
+      fill="#555" 
+      stroke="#FFF" 
+      strokeWidth="2" 
+      strokeDasharray="15,10" 
+    />
+    ```
+  </Accordion>
+  
+  <Accordion title="Entrance Marker">
+    An arrow at the bottom indicates the parking entrance:
+    
+    ```typescript
+    <SvgText 
+      x="140" 
+      y="430" 
+      fill="#FFE100" 
+      fontSize="14" 
+      fontWeight="bold"
+    >
+      ⬆ ENTRADA ⬆
+    </SvgText>
+    ```
+  </Accordion>
+  
+  <Accordion title="Asphalt Background">
+    A dark gray rounded rectangle simulates the parking lot surface:
+    
+    ```typescript
+    <Rect 
+      x="0" 
+      y="0" 
+      width="280" 
+      height="440" 
+      rx="15" 
+      fill="#333" 
+    />
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Legend
+
+A visual legend helps users understand the color coding:
+
+```typescript
+<View style={styles.legend}>
+  <View style={styles.legendItem}>
+    <View style={[styles.dot, {backgroundColor: '#4CAF50'}]}/>
+    <Text style={styles.legendText}>Libre</Text>
+  </View>
+  <View style={styles.legendItem}>
+    <View style={[styles.dot, {backgroundColor: '#FF4444'}]}/>
+    <Text style={styles.legendText}>Ocupado</Text>
+  </View>
+  <View style={styles.legendItem}>
+    <View style={[styles.dot, {backgroundColor: '#FFE100'}]}/>
+    <Text style={styles.legendText}>Seleccionado</Text>
+  </View>
+</View>
+```
+
+## Implementation
+
+The map is built using `react-native-svg` for crisp vector rendering:
+
+```typescript
+import Svg, { Rect, Text as SvgText, G } from 'react-native-svg';
+
+export default function ParkingMap({ 
+  selectedSpot, 
+  onSelectSpot, 
+  occupiedSpots 
+}: ParkingMapProps) {
+  return (
+    <View style={styles.container}>
+      <Text style={styles.title}>Selecciona tu lugar (1-10) 👇</Text>
+      
+      <View style={styles.mapWrapper}>
+        <Svg height="440" width="280" viewBox="0 0 280 440">
+          {/* Background */}
+          <Rect x="0" y="0" width="280" height="440" rx="15" fill="#333" />
+          
+          {/* Central lane */}
+          <Rect x="138" y="10" width="4" height="420" 
+            fill="#555" stroke="#FFF" strokeWidth="2" 
+            strokeDasharray="15,10" />
+
+          {/* Render spots */}
+          {SPOTS_LAYOUT.map((spot) => {
+            const isOccupied = occupiedSpots.includes(spot.id);
+            // ... spot rendering logic
+          })}
+          
+          {/* Entrance marker */}
+          <SvgText x="140" y="430" fill="#FFE100">⬆ ENTRADA ⬆</SvgText>
+        </Svg>
+      </View>
+    </View>
+  );
+}
+```
+
+<Tip>
+  The SVG approach ensures the map scales perfectly across different screen sizes while maintaining crisp edges.
+</Tip>
+
+## Accessibility
+
+- Large tap targets (70x70 pixels) ensure easy selection
+- High contrast colors improve visibility
+- Clear labeling with spot numbers
+- Visual and textual status indicators

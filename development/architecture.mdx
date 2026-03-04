@@ -1,0 +1,394 @@
+---
+title: 'App Architecture'
+description: 'Overview of PARKINMX app architecture, tech stack, folder structure, and design patterns'
+icon: 'sitemap'
+---
+
+## Overview
+
+PARKINMX is a cross-platform mobile parking reservation system built with React Native and Expo. The app follows a modern, scalable architecture with file-based routing, custom hooks for business logic, and Firebase for backend services.
+
+## Tech Stack
+
+<CardGroup cols={2}>
+  <Card title="Frontend" icon="mobile">
+    - React 19.1.0
+    - React Native 0.81.5
+    - Expo SDK ~54.0.27
+    - Expo Router ~6.0.17
+  </Card>
+  <Card title="Backend" icon="server">
+    - Firebase 12.6.0
+    - Firebase Admin 13.6.0
+    - Firebase Functions v2 (7.0.0)
+    - Node.js 24
+  </Card>
+  <Card title="Navigation" icon="route">
+    - React Navigation 7.1.8
+    - Bottom Tabs 7.4.0
+    - File-based routing (Expo Router)
+  </Card>
+  <Card title="UI & Animations" icon="palette">
+    - React Native Reanimated ~4.1.1
+    - Expo Blur ~15.0.8
+    - React Native Gesture Handler ~2.28.0
+    - Expo Symbols ~1.0.8
+  </Card>
+</CardGroup>
+
+## Architecture Patterns
+
+### File-Based Routing
+
+The app uses Expo Router for declarative, file-based navigation:
+
+```tsx app/_layout.tsx
+import { Stack } from "expo-router";
+import { ThemeProvider } from "@react-navigation/native";
+import { AchievementProvider } from '../context/AchievementContext';
+
+export default function RootLayout() {
+  return (
+    <AchievementProvider>
+      <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
+        <Stack screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="index" /> {/* Loading screen */}
+          <Stack.Screen name="login" />
+          <Stack.Screen name="(tabs)" /> {/* Main app */}
+          <Stack.Screen name="modal" options={{ presentation: "modal" }} />
+        </Stack>
+      </ThemeProvider>
+    </AchievementProvider>
+  );
+}
+```
+
+### Custom Hooks Pattern
+
+Business logic is separated into reusable custom hooks following the single responsibility principle:
+
+- `useLogin.ts` - Authentication and password recovery
+- `useRegistro.ts` - User registration flow
+- `useReservar.ts` - Parking spot reservation logic
+- `useHistorial.ts` - Reservation history
+- `useEditReservation.ts` - Modify existing reservations
+- `useTarjetas.ts` - Payment card management
+- `useAmigos.ts` - Friend system and requests
+- `useSupportChat.ts` - Real-time support chat with AI
+- `useSeguridad.ts` - Security settings (biometrics, PIN)
+- `usePushNotifications.ts` - Push notification handling
+
+<Accordion title="Example: useReservar Hook Structure">
+```typescript hooks/useReservar.ts
+export const useReservar = () => {
+  const router = useRouter();
+  
+  // Configuration constants
+  const HORA_APERTURA = 7;
+  const HORA_CIERRE = 23;
+  const SALDO_MINIMO = 120;
+  
+  // State management
+  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [selectedSpot, setSelectedSpot] = useState<string | null>(null);
+  const [occupiedSpots, setOccupiedSpots] = useState<string[]>([]);
+  
+  // Real-time listeners
+  useEffect(() => {
+    const unsub = onSnapshot(
+      doc(db, "users", auth.currentUser.uid),
+      (doc) => setCurrentCredits(doc.data()?.credits_balance || 0)
+    );
+    return () => unsub();
+  }, []);
+  
+  // Transaction logic
+  const handleReservation = async () => {
+    await runTransaction(db, async (transaction) => {
+      // Atomic reservation creation
+    });
+  };
+  
+  return {
+    selectedDate,
+    handleReservation,
+    // ... exported state and functions
+  };
+};
+```
+</Accordion>
+
+### Context Providers
+
+Global state management uses React Context:
+
+**AchievementContext** - Gamification system for user engagement
+
+```tsx context/AchievementContext.tsx
+export const AchievementProvider = ({ children }) => {
+  const [visible, setVisible] = useState(false);
+  const [achievement, setAchievement] = useState<AchievementData | null>(null);
+  
+  const unlockAchievement = (data: AchievementData) => {
+    setAchievement(data);
+    setVisible(true);
+    // Trigger confetti animation and XP reward
+  };
+  
+  return (
+    <AchievementContext.Provider value={{ unlockAchievement }}>
+      {children}
+      <Modal transparent visible={visible}>
+        <ConfettiCannon count={200} />
+        {/* Achievement UI */}
+      </Modal>
+    </AchievementContext.Provider>
+  );
+};
+```
+
+## Folder Structure
+
+```
+parkinmx/
+├── app/                        # File-based routing screens
+│   ├── _layout.tsx            # Root layout with navigation
+│   ├── index.tsx              # Initial loading screen
+│   ├── login.tsx              # Authentication screen
+│   ├── registro.tsx           # User registration
+│   ├── inicio.tsx             # Home/dashboard (main screen)
+│   ├── reservar.tsx           # Parking reservation interface
+│   ├── historial.tsx          # Reservation history
+│   ├── perfil.tsx             # User profile
+│   ├── seguridad.tsx          # Security settings
+│   ├── tarjetas.tsx           # Payment methods
+│   ├── mis-vehiculos.tsx      # Vehicle management
+│   ├── recargarsaldo.tsx      # Credit top-up
+│   ├── support.tsx            # AI support chat
+│   ├── ranking.tsx            # User leaderboard
+│   ├── AmigosScreen.tsx       # Friends system
+│   ├── EditReservationScreen.tsx
+│   ├── PerfilPublicoScreen.tsx
+│   └── ...
+├── components/                 # Reusable UI components
+│   ├── ui/                    # Base UI primitives
+│   ├── ParkingMap.tsx         # Interactive parking lot map
+│   ├── TicketModal.tsx        # Reservation ticket display
+│   ├── MyQRModal.tsx          # QR code for check-in
+│   ├── ScannerModal.tsx       # QR code scanner
+│   ├── BottomDateTimePicker.tsx
+│   ├── SmartAvatar.tsx        # User avatar component
+│   └── Skeleton.tsx           # Loading placeholders
+├── hooks/                      # Custom React hooks
+│   ├── useLogin.ts
+│   ├── useRegistro.ts
+│   ├── useReservar.ts
+│   ├── useHistorial.ts
+│   ├── useEditReservation.ts
+│   ├── useTarjetas.ts
+│   ├── useAmigos.ts
+│   ├── useSupportChat.ts
+│   ├── useSeguridad.ts
+│   ├── usePushNotifications.ts
+│   ├── useRecargar.ts
+│   ├── use Inicio.ts
+│   ├── use-color-scheme.ts
+│   ├── use-theme-color.ts
+│   └── uploadService.js       # Firebase Storage uploads
+├── context/                    # React Context providers
+│   └── AchievementContext.tsx # Gamification system
+├── constants/                  # App-wide constants
+│   ├── theme.ts               # Color schemes & styling
+│   └── AiContext.ts           # AI/Gemini configuration
+├── functions/                  # Firebase Cloud Functions
+│   ├── index.js               # Backend functions
+│   └── package.json
+├── assets/                     # Static resources
+│   └── images/                # Icons, splash screens
+├── configs/                    # Configuration files
+│   └── firebaseConfig.ts      # Firebase initialization
+├── app.json                    # Expo configuration
+├── firebase.json               # Firebase project config
+├── package.json
+└── tsconfig.json
+```
+
+## Design Patterns
+
+### 1. Separation of Concerns
+
+**Screens** (app/) handle only presentation and user interaction:
+```tsx
+export default function ReservarScreen() {
+  const {
+    selectedSpot,
+    handleReservation,
+    loading
+  } = useReservar(); // All logic in hook
+  
+  return <View>{/* UI only */}</View>;
+}
+```
+
+**Hooks** (hooks/) contain all business logic, Firebase operations, and state.
+
+### 2. Real-time Data Synchronization
+
+Firestore snapshots for live updates:
+
+```typescript
+useEffect(() => {
+  const q = query(
+    collection(db, "reservations"),
+    where("status", "in", ["active", "pending"])
+  );
+  
+  const unsub = onSnapshot(q, (snapshot) => {
+    const occupied = snapshot.docs.map(d => d.data().spotId);
+    setOccupiedSpots(occupied);
+  });
+  
+  return () => unsub();
+}, []);
+```
+
+### 3. Atomic Transactions
+
+Firestore transactions ensure data consistency:
+
+```typescript
+await runTransaction(db, async (transaction) => {
+  const userDoc = await transaction.get(userRef);
+  const currentBalance = userDoc.data().credits_balance;
+  
+  if (currentBalance < RESERVATION_COST) {
+    throw new Error("Insufficient credits");
+  }
+  
+  // Deduct credits and create reservation atomically
+  transaction.update(userRef, {
+    credits_balance: increment(-RESERVATION_COST)
+  });
+  
+  transaction.set(reservationRef, reservationData);
+});
+```
+
+### 4. Optimistic UI Updates
+
+Immediate feedback with rollback on error:
+
+```typescript
+const handleAction = async () => {
+  // Update UI immediately
+  setOptimisticState(newValue);
+  
+  try {
+    await apiCall();
+  } catch (error) {
+    // Rollback on failure
+    setOptimisticState(previousValue);
+    Alert.alert("Error", error.message);
+  }
+};
+```
+
+### 5. Component Composition
+
+Reusable components with clear interfaces:
+
+```tsx
+<ParkingMap
+  occupiedSpots={occupiedSpots}
+  selectedSpot={selectedSpot}
+  onSpotSelect={setSelectedSpot}
+  disabled={loading}
+/>
+```
+
+## State Management Strategy
+
+<Steps>
+  <Step title="Local Component State">
+    Use `useState` for UI-only state (modals, inputs, animations)
+  </Step>
+  <Step title="Custom Hooks">
+    Encapsulate feature-specific state and logic
+  </Step>
+  <Step title="Context Providers">
+    Share global state across the app (achievements, theme)
+  </Step>
+  <Step title="Firebase Realtime">
+    Server-side state synchronized via Firestore snapshots
+  </Step>
+</Steps>
+
+## Configuration Files
+
+### TypeScript Configuration
+
+```json tsconfig.json
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true,
+    "paths": {
+      "@/*": ["./*"]  // Absolute imports
+    }
+  }
+}
+```
+
+### Path Aliases
+
+Import from root with `@/` prefix:
+
+```typescript
+import { auth, db } from "@/configs/firebaseConfig";
+import { useLogin } from "@/hooks/useLogin";
+import { ThemedText } from "@/components/themed-text";
+```
+
+## Performance Optimizations
+
+<AccordionGroup>
+  <Accordion title="React Compiler (Experimental)">
+    Enabled via `app.json`:
+    ```json
+    "experiments": {
+      "reactCompiler": true
+    }
+    ```
+    Automatically optimizes React components for better performance.
+  </Accordion>
+  
+  <Accordion title="New Architecture">
+    React Native's new architecture is enabled:
+    ```json
+    "newArchEnabled": true
+    ```
+    Provides improved performance via JSI and Fabric renderer.
+  </Accordion>
+  
+  <Accordion title="Reanimated Worklets">
+    UI animations run on native thread:
+    ```typescript
+    const animatedStyle = useAnimatedStyle(() => {
+      return {
+        transform: [{ scale: withSpring(scale.value) }]
+      };
+    });
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Firebase Setup" icon="database" href="./firebase-setup">
+    Learn about Firestore collections and authentication
+  </Card>
+  <Card title="Expo Configuration" icon="gear" href="./expo-configuration">
+    Understand build settings and platform configs
+  </Card>
+</CardGroup>

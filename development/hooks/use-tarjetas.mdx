@@ -1,0 +1,640 @@
+---
+title: useTarjetas
+description: Hook for managing payment cards with multi-factor security, card generation, and wallet operations
+---
+
+## Overview
+
+The `useTarjetas` hook provides secure payment card management with multi-factor authentication (NIP + email verification). It handles card creation with simulated card number generation, primary card designation, and supports up to 5 cards per user. Security is enforced at every step with NIP validation and email verification codes.
+
+## Import
+
+```typescript
+import { useTarjetas } from '@/hooks/useTarjetas';
+```
+
+## Usage
+
+```typescript
+const {
+  cards,
+  loading,
+  modalStage,
+  setModalStage,
+  startAddCardProcess,
+  inputNip,
+  handlePressNip,
+  handleDeleteNip,
+  inputCode,
+  setInputCode,
+  cardName,
+  setCardName,
+  cardAlias,
+  setCardAlias,
+  handleSaveCard,
+  savingCard,
+  handleDeleteCard
+} = useTarjetas();
+
+// Start add card process (triggers NIP check)
+startAddCardProcess();
+
+// Enter NIP (auto-validates on 4th digit)
+handlePressNip("1");
+handlePressNip("2");
+handlePressNip("3");
+handlePressNip("4");
+
+// Verify email code
+setInputCode("1234");
+handleValidateCode();
+
+// Fill card details and save
+setCardName("John Doe");
+setCardAlias("My Main Card");
+await handleSaveCard();
+```
+
+## State Values
+
+### Card Data
+
+<ResponseField name="cards" type="array">
+  Array of user's registered payment cards, sorted with primary card first
+  ```typescript
+  Array<{
+    id: string;
+    userId: string;
+    holderName: string;
+    alias: string;
+    last4: string;
+    fullNumberSimulated: string;
+    expiry: string;  // "MM/YY"
+    type: "Visa" | "Mastercard";
+    isPrimary: boolean;
+    createdAt: Date;
+  }>
+  ```
+</ResponseField>
+
+<ResponseField name="loading" type="boolean">
+  Indicates if initial card data is being loaded
+</ResponseField>
+
+### Modal Flow State
+
+<ResponseField name="modalStage" type="'none' | 'nip_check' | 'email_check' | 'card_form'">
+  Current stage in the add card flow:
+  - `none`: No modal visible
+  - `nip_check`: User must enter security NIP
+  - `email_check`: User must verify email code
+  - `card_form`: User fills card details
+</ResponseField>
+
+### Security State
+
+<ResponseField name="inputNip" type="string[]">
+  Array of 4 strings representing NIP digits
+</ResponseField>
+
+<ResponseField name="storedNip" type="string | null">
+  User's security NIP from Firestore (internal use)
+</ResponseField>
+
+<ResponseField name="generatedCode" type="string | null">
+  The 4-digit verification code sent via email (internal use)
+</ResponseField>
+
+<ResponseField name="inputCode" type="string">
+  User's input for the email verification code
+</ResponseField>
+
+<ResponseField name="isSendingCode" type="boolean">
+  Indicates if email verification code is being sent
+</ResponseField>
+
+### Form State
+
+<ResponseField name="cardName" type="string">
+  Cardholder name input
+</ResponseField>
+
+<ResponseField name="cardAlias" type="string">
+  Optional card nickname/alias
+</ResponseField>
+
+<ResponseField name="savingCard" type="boolean">
+  Indicates if card is being saved to Firestore
+</ResponseField>
+
+## Functions
+
+### startAddCardProcess
+
+```typescript
+startAddCardProcess: () => void
+```
+
+Initiates the add card flow with validation:
+
+**Pre-checks:**
+1. Validates user hasn't reached 5-card limit
+2. Verifies user has configured security NIP
+
+**Effect:**
+- Resets `inputNip` to empty array
+- Sets `modalStage` to `nip_check`
+
+**Alerts:**
+- "Límite Alcanzado": If user has 5 cards
+- "Primero configura tu NIP en Seguridad": If no NIP set
+
+### handlePressNip
+
+```typescript
+handlePressNip: (digit: string) => void
+```
+
+Handles numeric keypad input for NIP entry:
+
+<ParamField path="digit" type="string">
+  Single digit ("0"-"9")
+</ParamField>
+
+**Behavior:**
+- Finds first empty position in `inputNip` array
+- Inserts digit at that position
+- Auto-validates when 4th digit is entered
+
+```typescript
+const idx = inputNip.findIndex(v => v === '');
+if (idx !== -1) {
+  const newArr = [...inputNip];
+  newArr[idx] = num;
+  setInputNip(newArr);
+  if (idx === 3) handleValidateNip(newArr.join(''));
+}
+```
+
+### handleDeleteNip
+
+```typescript
+handleDeleteNip: () => void
+```
+
+Handles backspace/delete for NIP entry:
+
+- Finds last filled position
+- Clears that digit
+- Updates state
+
+```typescript
+const idx = inputNip.findLastIndex(v => v !== '');
+if (idx !== -1) {
+  const newArr = [...inputNip];
+  newArr[idx] = '';
+  setInputNip(newArr);
+}
+```
+
+### handleValidateNip (internal)
+
+```typescript
+handleValidateNip: (enteredNip: string) => void
+```
+
+Validates entered NIP against stored value:
+
+- If correct: Calls `sendVerificationEmail()`
+- If incorrect: Shows alert and resets input
+
+### sendVerificationEmail (internal)
+
+```typescript
+sendVerificationEmail: () => Promise<void>
+```
+
+Sends verification code via EmailJS:
+
+**Process:**
+1. Generates random 4-digit code
+2. Sends email using hybrid template:
+   ```typescript
+   await emailjs.send(
+     EMAILJS_SERVICE_ID, 
+     EMAILJS_TEMPLATE_ID,
+     { 
+       to_email: userEmail, 
+       to_name: userName, 
+       view_ticket: "none",  // Hide ticket section
+       view_msg: "block",    // Show message section
+       message: code,
+       // Required fields (unused but prevent template error)
+       reservation_id: "NA",
+       qr_data: "NA",
+       date: "NA",
+       time: "NA",
+       spot: "NA",
+       plate: "NA"
+     },
+     { publicKey: EMAILJS_PUBLIC_KEY }
+   );
+   ```
+3. Shows success alert with user's email
+4. Advances to `email_check` stage
+
+### setInputCode
+
+```typescript
+setInputCode: (code: string) => void
+```
+
+Sets the user's input for email verification code.
+
+### handleValidateCode
+
+```typescript
+handleValidateCode: () => void
+```
+
+Verifies email code and advances flow:
+
+- If correct: Advances to `card_form` stage, resets form fields
+- If incorrect: Shows "Código incorrecto" alert
+
+### setCardName
+
+```typescript
+setCardName: (name: string) => void
+```
+
+Sets the cardholder name.
+
+### setCardAlias
+
+```typescript
+setCardAlias: (alias: string) => void
+```
+
+Sets the optional card nickname.
+
+### handleSaveCard
+
+```typescript
+handleSaveCard: () => Promise<void>
+```
+
+Generates and saves a new card to Firestore:
+
+**Validation:**
+- Requires `cardName` to be filled
+
+**Card Generation:**
+1. Randomly selects type: Visa or Mastercard (50/50)
+2. Generates random 16-digit number
+3. Generates random expiry (current year + 2-5 years)
+4. Extracts last 4 digits
+
+```typescript
+const type = Math.random() > 0.5 ? "Visa" : "Mastercard";
+let randomNum = '';
+for(let i=0; i<16; i++) randomNum += Math.floor(Math.random() * 10);
+
+const randomMonth = String(Math.floor(Math.random() * 12) + 1).padStart(2, '0');
+const randomYear = String(new Date().getFullYear() + Math.floor(Math.random() * 4) + 2).slice(-2);
+const randomExpiry = `${randomMonth}/${randomYear}`;
+```
+
+**Primary Card Logic:**
+- First card automatically set as primary (`isPrimary: true`)
+- Subsequent cards default to non-primary
+- Default alias: "Tarjeta Titular" (first) or "Tarjeta Familiar" (others)
+
+**Firestore Document:**
+```typescript
+{
+  userId: string;
+  holderName: string;
+  alias: string;
+  last4: string;
+  fullNumberSimulated: string;
+  expiry: string;  // "MM/YY"
+  type: "Visa" | "Mastercard";
+  isPrimary: boolean;
+  createdAt: Date;
+}
+```
+
+**Post-Save:**
+- Shows success alert with card details
+- Closes modal (`modalStage: 'none'`)
+- Refreshes card list
+
+### handleDeleteCard
+
+```typescript
+handleDeleteCard: (cardId: string) => void
+```
+
+Deletes a card with confirmation:
+
+<ParamField path="cardId" type="string">
+  The ID of the card to delete
+</ParamField>
+
+**Behavior:**
+- Shows native alert with "Cancelar" and "Eliminar" options
+- On confirm: Deletes document from Firestore
+- Refreshes card list
+
+```typescript
+Alert.alert("Eliminar", "¿Borrar esta tarjeta?", [
+  { text: "Cancelar" },
+  { 
+    text: "Eliminar", 
+    style: 'destructive', 
+    onPress: async () => {
+      await deleteDoc(doc(db, "cards", id));
+      fetchData();
+    }
+  }
+]);
+```
+
+### setModalStage
+
+```typescript
+setModalStage: (stage: 'none' | 'nip_check' | 'email_check' | 'card_form') => void
+```
+
+Directly controls the modal stage (use with caution).
+
+## Security Flow
+
+The add card process enforces a strict 3-step security flow:
+
+```
+1. NIP Check
+   ↓ (validates against Firestore)
+2. Email Verification
+   ↓ (validates code sent via email)
+3. Card Form
+   ↓ (saves to Firestore)
+✓ Card Added
+```
+
+This ensures:
+- User has physical access to the account (NIP)
+- User has access to registered email
+- Protection against unauthorized card additions
+
+## Card Limit
+
+Maximum 5 cards per user:
+
+```typescript
+if (cards.length >= 5) {
+  Alert.alert("Límite Alcanzado", "Solo puedes tener 5 tarjetas.");
+  return;
+}
+```
+
+This prevents:
+- Excessive storage usage
+- UI clutter
+- Potential abuse
+
+## Card Sorting
+
+Cards are sorted with primary card first:
+
+```typescript
+loadedCards.sort((a, b) => 
+  a.isPrimary === b.isPrimary ? 0 : a.isPrimary ? -1 : 1
+);
+```
+
+Ensures the primary card is always at the top of the list for quick selection.
+
+## Side Effects
+
+### Auto-Load on Mount
+
+Fetches cards and user's security NIP when component mounts:
+
+```typescript
+useEffect(() => { fetchData(); }, []);
+```
+
+## Example: Add Card Flow
+
+```typescript
+function CardWalletScreen() {
+  const {
+    cards,
+    loading,
+    modalStage,
+    setModalStage,
+    startAddCardProcess,
+    inputNip,
+    handlePressNip,
+    handleDeleteNip,
+    inputCode,
+    setInputCode,
+    handleValidateCode,
+    cardName,
+    setCardName,
+    cardAlias,
+    setCardAlias,
+    handleSaveCard,
+    savingCard
+  } = useTarjetas();
+
+  if (loading) return <ActivityIndicator />;
+
+  return (
+    <View>
+      {/* Card List */}
+      {cards.map(card => (
+        <View key={card.id}>
+          <Text>{card.alias || card.holderName}</Text>
+          <Text>{card.type} •••• {card.last4}</Text>
+          <Text>Exp: {card.expiry}</Text>
+          {card.isPrimary && <Badge>Principal</Badge>}
+        </View>
+      ))}
+
+      {/* Add Card Button */}
+      <Button
+        title="Agregar Tarjeta"
+        onPress={startAddCardProcess}
+        disabled={cards.length >= 5}
+      />
+
+      {/* Multi-Stage Modal */}
+      <Modal visible={modalStage !== 'none'}>
+        {/* Stage 1: NIP Check */}
+        {modalStage === 'nip_check' && (
+          <View>
+            <Text>Ingresa tu NIP de Seguridad</Text>
+            <View style={{ flexDirection: 'row' }}>
+              {inputNip.map((digit, i) => (
+                <View key={i}>
+                  <Text>{digit ? '•' : '_'}</Text>
+                </View>
+              ))}
+            </View>
+            {/* Numeric Keypad */}
+            {['1','2','3','4','5','6','7','8','9','0'].map(num => (
+              <Button
+                key={num}
+                title={num}
+                onPress={() => handlePressNip(num)}
+              />
+            ))}
+            <Button title="⌫" onPress={handleDeleteNip} />
+          </View>
+        )}
+
+        {/* Stage 2: Email Verification */}
+        {modalStage === 'email_check' && (
+          <View>
+            <Text>Código enviado a tu correo</Text>
+            <TextInput
+              value={inputCode}
+              onChangeText={setInputCode}
+              keyboardType="numeric"
+              maxLength={4}
+            />
+            <Button
+              title="Verificar"
+              onPress={handleValidateCode}
+            />
+          </View>
+        )}
+
+        {/* Stage 3: Card Form */}
+        {modalStage === 'card_form' && (
+          <View>
+            <Text>Datos de la Tarjeta</Text>
+            <TextInput
+              placeholder="Nombre del Titular *"
+              value={cardName}
+              onChangeText={setCardName}
+            />
+            <TextInput
+              placeholder="Alias (opcional)"
+              value={cardAlias}
+              onChangeText={setCardAlias}
+            />
+            <Button
+              title="Guardar Tarjeta"
+              onPress={handleSaveCard}
+              disabled={savingCard}
+            />
+          </View>
+        )}
+
+        {/* Close Button */}
+        <Button
+          title="Cancelar"
+          onPress={() => setModalStage('none')}
+        />
+      </Modal>
+    </View>
+  );
+}
+```
+
+## Example: Custom NIP Keypad
+
+```typescript
+function NipKeypad({ inputNip, onPress, onDelete }) {
+  const numbers = [
+    ['1', '2', '3'],
+    ['4', '5', '6'],
+    ['7', '8', '9'],
+    ['', '0', '⌫']
+  ];
+
+  return (
+    <View>
+      {/* NIP Display */}
+      <View style={{ flexDirection: 'row', gap: 10 }}>
+        {inputNip.map((digit, i) => (
+          <View 
+            key={i} 
+            style={{
+              width: 50, 
+              height: 50, 
+              borderWidth: 2,
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
+          >
+            <Text style={{ fontSize: 24 }}>
+              {digit ? '•' : ''}
+            </Text>
+          </View>
+        ))}
+      </View>
+
+      {/* Keypad Grid */}
+      {numbers.map((row, i) => (
+        <View key={i} style={{ flexDirection: 'row' }}>
+          {row.map((num, j) => (
+            <TouchableOpacity
+              key={j}
+              onPress={() => {
+                if (num === '⌫') onDelete();
+                else if (num) onPress(num);
+              }}
+              disabled={!num}
+              style={{ width: 80, height: 80 }}
+            >
+              <Text style={{ fontSize: 24 }}>{num}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      ))}
+    </View>
+  );
+}
+```
+
+## Email Template Configuration
+
+The hook uses a hybrid EmailJS template that supports both ticket and message views:
+
+**Template Variables:**
+- `view_ticket`: `"none"` to hide, `"block"` to show
+- `view_msg`: `"none"` to hide, `"block"` to show
+- `message`: The verification code or message text
+
+**For card verification emails:**
+```typescript
+{
+  view_ticket: "none",
+  view_msg: "block",
+  message: code,
+  // Fill unused fields to prevent template errors
+  reservation_id: "NA",
+  qr_data: "NA",
+  date: "NA",
+  time: "NA",
+  spot: "NA",
+  plate: "NA"
+}
+```
+
+## Firebase Dependencies
+
+- **Firestore Collections**: `cards`, `users`
+- **Authentication**: Requires authenticated user (`auth.currentUser`)
+- **User document fields**: `securityNip`
+
+## Related Hooks
+
+- [useReservar](/development/hooks/use-reservar) - Uses cards for payment selection
+- [useHistorial](/development/hooks/use-historial) - Filters history by card
+- [useLogin](/development/hooks/use-login) - Authentication required for card management

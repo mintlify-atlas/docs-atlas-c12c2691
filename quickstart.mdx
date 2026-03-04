@@ -1,80 +1,271 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: Quick start
+description: Get started with PARKINMX in minutes - from download to your first reservation
+icon: "rocket"
 ---
 
-## Get started in three steps
+Get up and running with PARKINMX in just a few minutes. This guide will walk you through downloading the app, creating your account, and making your first parking reservation.
 
-Get your documentation site running locally and make your first customization.
+## Prerequisites
 
-### Step 1: Set up your local environment
-
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 2: Deploy your changes
-
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
-
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
-
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 3: Go live
-
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
-
-## Next steps
-
-Now that you have your docs running, explore these key features:
-
-<CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
-</CardGroup>
+Before you begin, make sure you have:
+- A smartphone (iOS 13+ or Android 8+) or web browser
+- A valid email address
+- A credit or debit card for payments
+- Your vehicle's license plate number
 
 <Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
+PARKINMX is available on iOS, Android, and Web. Choose the platform that works best for you!
 </Note>
+
+## Step-by-step guide
+
+<Steps>
+  <Step title="Download PARKINMX">
+    Get the app for your platform:
+    
+    <Tabs>
+      <Tab title="iOS">
+        Download from the App Store:
+        
+        ```bash
+        https://apps.apple.com/parkinmx
+        ```
+        
+        **Requirements:** iOS 13.0 or later, compatible with iPhone and iPad
+      </Tab>
+      
+      <Tab title="Android">
+        Download from Google Play:
+        
+        ```bash
+        https://play.google.com/store/apps/parkinmx
+        ```
+        
+        **Requirements:** Android 8.0 (API 26) or later
+      </Tab>
+      
+      <Tab title="Web">
+        Access directly in your browser:
+        
+        ```bash
+        https://parkinmx.app
+        ```
+        
+        **Supported browsers:** Chrome 90+, Safari 14+, Firefox 88+, Edge 90+
+      </Tab>
+    </Tabs>
+    
+    <Tip>
+    On mobile, you'll be prompted to enable notifications. We recommend allowing them to receive reservation reminders and important updates.
+    </Tip>
+  </Step>
+  
+  <Step title="Create your account">
+    Launch the app and tap **"Registrarse"** (Sign Up):
+    
+    1. **Enter your information:**
+       - First name and last name
+       - Email address
+       - Username (unique identifier)
+       - Password (minimum 6 characters)
+    
+    2. **Verify your email:**
+       - Check your inbox for a verification email
+       - Click the verification link
+       - Return to the app to continue
+    
+    <Accordion title="Example registration request">
+    ```typescript
+    interface RegistrationData {
+      nombres: string;      // "Juan"
+      apellidos: string;    // "Pérez"
+      email: string;        // "juan@example.com"
+      username: string;     // "juanp"
+      password: string;     // Hashed before storage
+    }
+    ```
+    </Accordion>
+    
+    <Warning>
+    Choose a strong password and keep your credentials secure. Your account contains payment information and reservation history.
+    </Warning>
+  </Step>
+  
+  <Step title="Set up biometric authentication (optional)">
+    For faster, more secure access, enable Face ID, Touch ID, or fingerprint authentication:
+    
+    1. Go to **Perfil** → **Seguridad**
+    2. Toggle **"Usar Face ID"** or **"Usar Huella Digital"**
+    3. Follow the system prompts to authenticate
+    
+    Once enabled, you can log in instantly without typing your password.
+    
+    <Info>
+    Biometric data is stored securely on your device and never transmitted to our servers.
+    </Info>
+  </Step>
+  
+  <Step title="Add your first vehicle">
+    Navigate to **Mi Garaje** (My Garage) from the side menu:
+    
+    1. Tap the yellow **+** button (floating action button)
+    2. Fill in the vehicle form:
+       - **License Plate** (required): Your vehicle's registration number
+       - **Alias** (required): A friendly name like "My Honda" or "Work Car"
+       - **Brand** (required): e.g., "Toyota", "Honda", "Ford"
+       - **Model** (optional): e.g., "Camry", "Civic", "F-150"
+       - **Color** (optional): e.g., "Blue", "Red", "Silver"
+    3. Tap **"Guardar"** (Save)
+    
+    ```typescript Example vehicle
+    {
+      plate: "ABC1234",
+      alias: "My Honda",
+      brand: "Honda",
+      model: "Accord",
+      color: "Silver"
+    }
+    ```
+    
+    <Tip>
+    You can add multiple vehicles and switch between them when making reservations. Great for families or managing personal and work vehicles!
+    </Tip>
+  </Step>
+  
+  <Step title="Add funds to your wallet">
+    Before making a reservation, you need to load your digital wallet:
+    
+    1. Go to **Mi Cartera** → **Recargar Saldo** (Recharge Balance)
+    2. Enter the amount you want to add (minimum $30 MXN)
+    3. Review the credit conversion:
+       - **Exchange rate:** $1 MXN = 6 credits
+       - **Bonus:** +20 credits for recharges ≥100 credits
+    4. Tap **"Recargar"** and complete payment via Mercado Pago
+    
+    <Accordion title="Credit calculation example">
+    **Recharge $50 MXN:**
+    - Base credits: 50 × 6 = 300 credits
+    - Bonus (≥100 credits): +20 credits
+    - **Total: 320 credits**
+    
+    **Recharge $20 MXN:**
+    - Base credits: 20 × 6 = 120 credits
+    - No bonus (below threshold)
+    - **Total: 120 credits**
+    </Accordion>
+    
+    <Note>
+    The minimum balance required to make a reservation is **120 credits** (equivalent to $20 MXN).
+    </Note>
+  </Step>
+  
+  <Step title="Make your first reservation">
+    Now you're ready to reserve a parking spot!
+    
+    1. **Navigate to Reservar** (Reserve) from the home screen or menu
+    
+    2. **Select your date and time:**
+       - Choose your arrival date
+       - Pick your time slot (operating hours: 7 AM - 11 PM)
+    
+    3. **Choose your parking spot:**
+       - View the interactive map showing 10 spots (1-10)
+       - Green spots are available
+       - Red spots are occupied
+       - Yellow is your selection
+       - Tap a green spot to select it
+    
+    4. **Select your vehicle:**
+       - Choose from your registered vehicles
+       - The selected vehicle's plate will appear on your ticket
+    
+    5. **Verify and confirm:**
+       - Enter your 4-digit security PIN
+       - Enter the 6-digit email verification code (sent to your inbox)
+       - Review reservation details and cost (120 credits deducted)
+       - Tap **"Confirmar Reservación"**
+    
+    6. **Receive your QR ticket:**
+       - Your reservation is confirmed instantly
+       - A QR code ticket is generated
+       - You'll receive a push notification 15 minutes before your arrival time
+    
+    <Info>
+    You can edit or cancel your reservation up to 1 hour before the scheduled time without penalty. Cancellations within 1 hour incur a 100 credit fee.
+    </Info>
+  </Step>
+</Steps>
+
+## What's next?
+
+Congratulations! You've successfully set up PARKINMX and made your first reservation. Here's what to explore next:
+
+<CardGroup cols={2}>
+  <Card title="View your reservation" icon="calendar-check" href="/features/reservations">
+    Check your active reservations, edit details, and view your QR ticket.
+  </Card>
+  
+  <Card title="Explore the parking map" icon="map-location-dot" href="/features/parking-map">
+    Learn how the interactive 10-spot map works and check real-time availability.
+  </Card>
+  
+  <Card title="Manage payment methods" icon="wallet" href="/guides/payment-methods">
+    Add payment cards, set up auto-reload, and track your credit balance.
+  </Card>
+  
+  <Card title="View reservation history" icon="clock-rotate-left" href="/guides/history-tracking">
+    Access past reservations, download receipts, and review your parking patterns.
+  </Card>
+</CardGroup>
+
+## Common questions
+
+<AccordionGroup>
+  <Accordion title="How do I use my QR ticket at the parking lot?">
+    When you arrive, open the PARKINMX app and tap on your active reservation to display your QR code. Hold your phone up to the scanner at the entrance gate. The system will verify your reservation and grant access.
+    
+    When exiting, scan your QR code again at the exit gate. Make sure to exit before your reservation time expires to avoid additional charges.
+  </Accordion>
+  
+  <Accordion title="Can I share my reservation with someone else?">
+    Yes! Tap the share icon on your reservation details screen to send your QR ticket via email, SMS, or messaging apps. The recipient can use your QR code to access the parking spot, but make sure they're driving the vehicle registered in your reservation.
+  </Accordion>
+  
+  <Accordion title="What happens if I arrive late or need to leave early?">
+    Your reservation is valid for the time slot you booked. If you arrive late, your spot remains reserved until the end time. If you need to leave early, you can simply scan your QR code and exit - no additional action needed.
+    
+    For significant delays or no-shows, penalties may apply. Check your reservation details for specific terms.
+  </Accordion>
+  
+  <Accordion title="How do I add more vehicles or payment methods later?">
+    - **Vehicles:** Go to **Mi Garaje** → tap the **+** button → fill in vehicle details
+    - **Payment methods:** Go to **Mi Cartera** → **Tarjetas** → **"Agregar Tarjeta"**
+    
+    You can add unlimited vehicles and up to 5 payment cards per account.
+  </Accordion>
+  
+  <Accordion title="Is my payment information secure?">
+    Yes! All payment processing is handled through Mercado Pago, a certified PCI-DSS Level 1 payment gateway. We never store your full card details on our servers. Card data is encrypted and tokenized for maximum security.
+    
+    Additionally, all transactions require two-factor authentication (PIN + email verification) for added protection.
+  </Accordion>
+</AccordionGroup>
+
+## Need help?
+
+If you encounter any issues during setup:
+
+<CardGroup cols={2}>
+  <Card title="Support Chat" icon="headset" href="/guides/support-chat">
+    Chat with ParkBot, our AI assistant, or request help from a human agent.
+  </Card>
+  
+  <Card title="Installation Guide" icon="download" href="/installation">
+    Detailed platform-specific installation instructions and troubleshooting.
+  </Card>
+</CardGroup>
+
+---
+
+Ready to dive deeper? Explore our [complete feature documentation](/features/reservations) or learn about [advanced reservation workflows](/guides/making-reservation).

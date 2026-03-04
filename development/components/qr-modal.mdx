@@ -1,0 +1,489 @@
+---
+title: 'MyQRModal Component'
+description: 'Personal QR code display for user identification and friend connections'
+---
+
+## Overview
+
+The `MyQRModal` component displays a user's personal QR code in a styled card interface. Other users can scan this QR code with the `ScannerModal` to add them as friends or verify their identity.
+
+## Component Interface
+
+```typescript components/MyQRModal.tsx:6-11
+interface Props {
+  visible: boolean;
+  onClose: () => void;
+  userId: string;
+  userName: string;
+}
+```
+
+## Props
+
+<ParamField path="visible" type="boolean" required>
+  Controls the visibility of the QR modal. When `true`, the modal slides up with a transparent overlay.
+</ParamField>
+
+<ParamField path="onClose" type="() => void" required>
+  Callback invoked when the user closes the modal by tapping the overlay, close button (X), or the "Cerrar" button.
+</ParamField>
+
+<ParamField path="userId" type="string" required>
+  The unique user identifier to encode in the QR code. This is typically the Firebase Authentication UID.
+  
+  **Example:** `"abc123def456"` generates QR value `"parkinmx:abc123def456"`
+</ParamField>
+
+<ParamField path="userName" type="string" required>
+  The display name shown below the QR code with an `@` prefix. Used for visual identification.
+  
+  **Example:** `"JohnDoe"` displays as `"@JohnDoe"`
+</ParamField>
+
+## QR Code Generation
+
+The component generates a QR code using a custom protocol:
+
+```typescript components/MyQRModal.tsx:14-15
+const qrValue = `parkinmx:${userId}`;
+```
+
+### Protocol Format
+
+```
+parkinmx:<userId>
+```
+
+**Examples:**
+- User ID: `"user123"` → QR Value: `"parkinmx:user123"`
+- User ID: `"Abc-XyZ-789"` → QR Value: `"parkinmx:Abc-XyZ-789"`
+
+This protocol prefix allows the `ScannerModal` to validate that scanned QR codes belong to PARKINMX users.
+
+## QR Display Configuration
+
+```tsx components/MyQRModal.tsx:32-38
+<View style={styles.qrContainer}>
+  <QRCode value={qrValue} size={200} />
+  <View style={styles.avatarContainer}>
+    {/* Decorative icon at center */}
+    <Ionicons name="car-sport" size={30} color="#000" />
+  </View>
+</View>
+```
+
+<ParamField path="value" type="string">
+  The data encoded in the QR code (`parkinmx:${userId}`).
+</ParamField>
+
+<ParamField path="size" type="number">
+  QR code dimensions in pixels. Set to `200` for optimal mobile scanning.
+</ParamField>
+
+### Center Logo Overlay
+
+The decorative car icon is absolutely positioned over the QR code center:
+
+```typescript components/MyQRModal.tsx:60
+avatarContainer: { 
+  position: 'absolute', 
+  backgroundColor: '#FFE100', 
+  padding: 5, 
+  borderRadius: 50, 
+  borderWidth: 3, 
+  borderColor: '#FFF' 
+}
+```
+
+This yellow circle with white border creates a branded appearance while maintaining QR code scannability (center area has error correction).
+
+## User Information Display
+
+```tsx components/MyQRModal.tsx:40-41
+<Text style={styles.userName}>@{userName}</Text>
+<Text style={styles.uid}>ID: {userId.slice(0, 8)}...</Text>
+```
+
+### Username
+
+Displayed with `@` prefix in large, bold text:
+
+```typescript components/MyQRModal.tsx:62
+userName: { fontSize: 22, fontWeight: '900', color: '#000' }
+```
+
+### User ID Preview
+
+Shows first 8 characters of the user ID followed by ellipsis:
+
+```typescript
+// If userId = "abc123def456ghi789"
+// Displays: "ID: abc123de..."
+```
+
+Styling:
+
+```typescript components/MyQRModal.tsx:63
+uid: { color: '#AAA', fontSize: 12, marginBottom: 20 }
+```
+
+## Modal Structure
+
+```tsx components/MyQRModal.tsx:18-46
+<Modal animationType="slide" transparent={true} visible={visible} onRequestClose={onClose}>
+  <View style={styles.overlay}>
+    <View style={styles.card}>
+      {/* Header with title and close button */}
+      <View style={styles.header}>
+        <Text style={styles.title}>Tu Tarjeta de ParkIn</Text>
+        <TouchableOpacity onPress={onClose}>
+          <Ionicons name="close" size={24} color="#000" />
+        </TouchableOpacity>
+      </View>
+
+      <Text style={styles.subtitle}>
+        Muestra este código a un amigo para que te agregue.
+      </Text>
+
+      {/* QR Code with overlay icon */}
+      <View style={styles.qrContainer}>...</View>
+
+      {/* User info */}
+      <Text style={styles.userName}>@{userName}</Text>
+      <Text style={styles.uid}>ID: {userId.slice(0, 8)}...</Text>
+
+      {/* Close button */}
+      <TouchableOpacity style={styles.btn} onPress={onClose}>
+        <Text style={styles.btnText}>Cerrar</Text>
+      </TouchableOpacity>
+    </View>
+  </View>
+</Modal>
+```
+
+### Header Section
+
+```tsx components/MyQRModal.tsx:22-27
+<View style={styles.header}>
+  <Text style={styles.title}>Tu Tarjeta de ParkIn</Text>
+  <TouchableOpacity onPress={onClose}>
+    <Ionicons name="close" size={24} color="#000" />
+  </TouchableOpacity>
+</View>
+```
+
+Flexbox layout with space-between alignment for title and close button.
+
+## Usage Example
+
+```tsx
+import { MyQRModal } from './components/MyQRModal';
+import { useState } from 'react';
+import { useAuth } from './hooks/useAuth';
+
+function ProfileScreen() {
+  const [showQR, setShowQR] = useState(false);
+  const { user } = useAuth();
+
+  return (
+    <>
+      <Button 
+        title="Mostrar Mi QR" 
+        onPress={() => setShowQR(true)} 
+      />
+      
+      <MyQRModal
+        visible={showQR}
+        onClose={() => setShowQR(false)}
+        userId={user.uid}
+        userName={user.displayName || 'Usuario'}
+      />
+    </>
+  );
+}
+```
+
+## Integration Flow
+
+### Step 1: User A Shows QR
+
+```tsx
+<MyQRModal
+  visible={true}
+  userId="abc123def456"
+  userName="JohnDoe"
+  onClose={...}
+/>
+```
+
+Generates QR code with value: `parkinmx:abc123def456`
+
+### Step 2: User B Scans QR
+
+```tsx
+<ScannerModal
+  visible={true}
+  onScanned={(scannedId) => {
+    console.log(scannedId); // "abc123def456"
+    addFriendToFirestore(scannedId);
+  }}
+  onClose={...}
+/>
+```
+
+### Step 3: Friend Request Created
+
+```typescript
+const addFriendToFirestore = async (friendId: string) => {
+  const currentUserId = auth.currentUser.uid;
+  
+  await addDoc(collection(db, 'friendships'), {
+    userId: currentUserId,
+    friendId: friendId,
+    createdAt: serverTimestamp(),
+    status: 'accepted'
+  });
+};
+```
+
+## Styling System
+
+```typescript components/MyQRModal.tsx:52-67
+const styles = StyleSheet.create({
+  overlay: { 
+    flex: 1, 
+    backgroundColor: 'rgba(0,0,0,0.6)', 
+    justifyContent: 'center', 
+    alignItems: 'center' 
+  },
+  card: { 
+    width: '85%', 
+    backgroundColor: '#FFF', 
+    borderRadius: 25, 
+    padding: 25, 
+    alignItems: 'center', 
+    elevation: 10 
+  },
+  header: { 
+    flexDirection: 'row', 
+    width: '100%', 
+    justifyContent: 'space-between', 
+    alignItems: 'center', 
+    marginBottom: 10 
+  },
+  title: { fontSize: 20, fontWeight: 'bold', color: '#000' },
+  subtitle: { color: '#666', textAlign: 'center', marginBottom: 25 },
+  
+  qrContainer: { 
+    padding: 15, 
+    backgroundColor: '#FFF', 
+    borderRadius: 15, 
+    elevation: 5, 
+    justifyContent: 'center', 
+    alignItems: 'center', 
+    marginBottom: 20 
+  },
+  avatarContainer: { 
+    position: 'absolute', 
+    backgroundColor: '#FFE100', 
+    padding: 5, 
+    borderRadius: 50, 
+    borderWidth: 3, 
+    borderColor: '#FFF' 
+  },
+  
+  userName: { fontSize: 22, fontWeight: '900', color: '#000' },
+  uid: { color: '#AAA', fontSize: 12, marginBottom: 20 },
+  
+  btn: { 
+    backgroundColor: '#000', 
+    paddingVertical: 12, 
+    paddingHorizontal: 40, 
+    borderRadius: 25 
+  },
+  btnText: { color: '#FFE100', fontWeight: 'bold' }
+});
+```
+
+### Color Scheme
+
+| Element | Color | Purpose |
+|---------|-------|----------|
+| Overlay | `rgba(0,0,0,0.6)` | Semi-transparent background |
+| Card | `#FFF` | White card background |
+| Avatar Circle | `#FFE100` | PARKINMX brand yellow |
+| Button Background | `#000` | Black button |
+| Button Text | `#FFE100` | Yellow text on black |
+
+## Modal Behavior
+
+```tsx components/MyQRModal.tsx:18
+<Modal animationType="slide" transparent={true} visible={visible} onRequestClose={onClose}>
+```
+
+<ParamField path="animationType" type="'slide'">
+  Modal slides up from bottom of screen.
+</ParamField>
+
+<ParamField path="transparent" type="boolean">
+  Enables semi-transparent overlay (requires `overlay` style with transparent background).
+</ParamField>
+
+<ParamField path="onRequestClose" type="function">
+  Android back button handler.
+</ParamField>
+
+### Dismiss Methods
+
+1. **Tap outside card**: Tap the dark overlay
+2. **Close icon**: Tap the X button in header
+3. **Close button**: Tap the "Cerrar" button at bottom
+4. **Back button**: Android hardware back button
+
+All methods invoke the `onClose()` callback.
+
+## Close Button
+
+```tsx components/MyQRModal.tsx:43-45
+<TouchableOpacity style={styles.btn} onPress={onClose}>
+  <Text style={styles.btnText}>Cerrar</Text>
+</TouchableOpacity>
+```
+
+Black button with yellow text, rounded corners (borderRadius: 25).
+
+## Dependencies
+
+```json
+{
+  "react": "^18.x",
+  "react-native": "^0.73.x",
+  "react-native-qrcode-svg": "^6.x",
+  "@expo/vector-icons": "^13.x"
+}
+```
+
+## QR Code Scanning Distance
+
+Optimal scanning distance for 200px QR code:
+
+- **Minimum**: ~10cm (4 inches)
+- **Maximum**: ~50cm (20 inches)
+- **Optimal**: ~20-30cm (8-12 inches)
+
+Consider adding instructions:
+
+```tsx
+<Text style={styles.scanInstructions}>
+  Mantén el teléfono a 20-30cm de distancia
+</Text>
+```
+
+## Error Correction Level
+
+The `react-native-qrcode-svg` library uses Level M (15%) error correction by default. This allows the center logo to cover ~15% of the QR code area without affecting scannability.
+
+To adjust:
+
+```tsx
+<QRCode 
+  value={qrValue} 
+  size={200}
+  ecl="H" // High (30%) - allows larger center logo
+/>
+```
+
+Error correction levels:
+- **L**: 7% damage tolerance
+- **M**: 15% damage tolerance (default)
+- **Q**: 25% damage tolerance
+- **H**: 30% damage tolerance
+
+## Security Considerations
+
+1. **User ID Exposure**: The full user ID is encoded in the QR. Ensure user IDs are not sensitive data.
+2. **QR Validation**: Scanning apps must validate the `parkinmx:` protocol to prevent phishing.
+3. **Screenshot Prevention**: Consider detecting screenshots for security-sensitive contexts:
+
+```typescript
+import { useScreenCapture } from 'react-native-screen-capture';
+
+useScreenCapture(() => {
+  Alert.alert('Advertencia', 'No compartas capturas de pantalla de tu QR.');
+});
+```
+
+## Accessibility
+
+Recommended improvements:
+
+```tsx
+<TouchableOpacity
+  style={styles.btn}
+  onPress={onClose}
+  accessible={true}
+  accessibilityLabel="Cerrar ventana de código QR"
+  accessibilityRole="button"
+>
+  <Text style={styles.btnText}>Cerrar</Text>
+</TouchableOpacity>
+```
+
+Add accessibility hint for QR code:
+
+```tsx
+<View 
+  style={styles.qrContainer}
+  accessible={true}
+  accessibilityLabel={`Código QR de ${userName}. ID: ${userId}`}
+  accessibilityHint="Muestra este código a otra persona para que lo escanee"
+>
+  <QRCode value={qrValue} size={200} />
+</View>
+```
+
+## Performance
+
+- QR generation is synchronous and fast (less than 10ms)
+- No network requests required
+- Component is lightweight and suitable for frequent opening/closing
+- Consider memoizing QR value if modal reopens frequently:
+
+```typescript
+const qrValue = useMemo(() => `parkinmx:${userId}`, [userId]);
+```
+
+## Customization Options
+
+### Change QR Colors
+
+```tsx
+<QRCode 
+  value={qrValue} 
+  size={200}
+  color="#000" // QR foreground color
+  backgroundColor="#FFF" // QR background color
+/>
+```
+
+### Add QR Logo Image
+
+```tsx
+<QRCode 
+  value={qrValue} 
+  size={200}
+  logo={require('./assets/logo.png')}
+  logoSize={40}
+  logoBackgroundColor='#FFF'
+/>
+```
+
+### Adjust Card Width
+
+```typescript
+card: { 
+  width: '90%', // Increase from 85% for larger QR
+  maxWidth: 400, // Cap width on tablets
+  // ... rest of styles
+}
+```

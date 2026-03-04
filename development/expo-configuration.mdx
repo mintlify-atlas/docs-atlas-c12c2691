@@ -1,0 +1,841 @@
+---
+title: 'Expo Configuration'
+description: 'Expo configuration, plugins, build settings, and platform-specific configs'
+icon: 'mobile'
+---
+
+## Overview
+
+PARKINMX uses Expo SDK ~54.0.27 with file-based routing via Expo Router. The app is configured to run on iOS, Android, and Web with platform-specific optimizations.
+
+<Info>
+  **Expo SDK**: ~54.0.27
+  
+  **Expo Router**: ~6.0.17
+  
+  **React Native**: 0.81.5
+</Info>
+
+## App Configuration
+
+The main Expo configuration is in `app.json`:
+
+```json app.json
+{
+  "expo": {
+    "name": "parkinmx",
+    "slug": "parkinmx",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "parkinmx",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    
+    "ios": {
+      "supportsTablet": true
+    },
+    
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#E6F4FE",
+        "foregroundImage": "./assets/images/android-icon-foreground.png",
+        "backgroundImage": "./assets/images/android-icon-background.png",
+        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+      },
+      "edgeToEdgeEnabled": true,
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.USE_BIOMETRIC",
+        "android.permission.USE_FINGERPRINT"
+      ]
+    },
+    
+    "web": {
+      "output": "static",
+      "favicon": "./assets/images/favicon.png"
+    },
+    
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/splash-icon.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#ffffff",
+          "dark": {
+            "backgroundColor": "#000000"
+          }
+        }
+      ],
+      "expo-web-browser",
+      "expo-secure-store",
+      "expo-local-authentication",
+      "expo-barcode-scanner"
+    ],
+    
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    },
+    
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "932388e1-77d0-406c-8f32-ea382c964a89"
+      }
+    },
+    
+    "owner": "alejandromv03"
+  }
+}
+```
+
+## Configuration Breakdown
+
+### Basic App Info
+
+<ParamField path="name" type="string">
+  App display name: **parkinmx**
+</ParamField>
+
+<ParamField path="slug" type="string">
+  URL-friendly identifier used in Expo Go and EAS
+</ParamField>
+
+<ParamField path="version" type="string">
+  Current app version: **1.0.0**
+</ParamField>
+
+<ParamField path="orientation" type="string">
+  Locked to **portrait** mode for consistent UX
+</ParamField>
+
+<ParamField path="scheme" type="string">
+  Deep linking scheme: `parkinmx://`
+  
+  Enables opening the app via custom URLs:
+  ```typescript
+  Linking.openURL('parkinmx://reservar');
+  ```
+</ParamField>
+
+<ParamField path="userInterfaceStyle" type="string">
+  **automatic** - Supports both light and dark mode based on system settings
+</ParamField>
+
+### React Native New Architecture
+
+```json
+"newArchEnabled": true
+```
+
+<Tip>
+  The new architecture enables:
+  - **JSI (JavaScript Interface)**: Direct JS-to-native communication without the bridge
+  - **Fabric**: New rendering system for better performance
+  - **TurboModules**: Lazy-loaded native modules
+  - **Concurrent Rendering**: Better UI responsiveness
+</Tip>
+
+## Platform-Specific Configuration
+
+### iOS Configuration
+
+```json app.json
+"ios": {
+  "supportsTablet": true
+}
+```
+
+<CardGroup cols={2}>
+  <Card title="iPhone Support" icon="mobile">
+    Optimized for all iPhone models (SE to Pro Max)
+  </Card>
+  <Card title="iPad Support" icon="tablet">
+    Full tablet support with responsive layouts
+  </Card>
+</CardGroup>
+
+**Additional iOS Setup** (if building locally):
+
+```json
+"ios": {
+  "supportsTablet": true,
+  "bundleIdentifier": "com.yourcompany.parkinmx",
+  "buildNumber": "1.0.0",
+  "infoPlist": {
+    "NSCameraUsageDescription": "ParkInMX needs camera access to scan QR codes for parking check-in.",
+    "NSFaceIDUsageDescription": "ParkInMX uses Face ID to securely authenticate you.",
+    "NSLocationWhenInUseUsageDescription": "ParkInMX needs your location to show nearby parking lots."
+  }
+}
+```
+
+### Android Configuration
+
+```json app.json
+"android": {
+  "adaptiveIcon": {
+    "backgroundColor": "#E6F4FE",
+    "foregroundImage": "./assets/images/android-icon-foreground.png",
+    "backgroundImage": "./assets/images/android-icon-background.png",
+    "monochromeImage": "./assets/images/android-icon-monochrome.png"
+  },
+  "edgeToEdgeEnabled": true,
+  "predictiveBackGestureEnabled": false,
+  "permissions": [
+    "android.permission.USE_BIOMETRIC",
+    "android.permission.USE_FINGERPRINT"
+  ]
+}
+```
+
+#### Adaptive Icons
+
+<AccordionGroup>
+  <Accordion title="Foreground Image">
+    The main icon graphic displayed on top of the background.
+    
+    **Requirements**:
+    - Size: 108x108dp (432x432px @4x)
+    - Format: PNG with transparency
+    - Safe zone: 66dp diameter circle in center
+  </Accordion>
+  
+  <Accordion title="Background Image/Color">
+    Either a solid color (`#E6F4FE`) or an image.
+    
+    Used as the backdrop for the foreground icon.
+  </Accordion>
+  
+  <Accordion title="Monochrome Image">
+    Single-color version for themed icons (Android 13+).
+    
+    Allows the system to apply user-selected colors to the icon.
+  </Accordion>
+</AccordionGroup>
+
+#### Android Features
+
+<ParamField path="edgeToEdgeEnabled" type="boolean">
+  **true** - Content draws behind system bars for immersive UI
+  
+  ```typescript
+  import { useSafeAreaInsets } from 'react-native-safe-area-context';
+  
+  const insets = useSafeAreaInsets();
+  // Apply insets.top, insets.bottom to avoid system UI overlap
+  ```
+</ParamField>
+
+<ParamField path="predictiveBackGestureEnabled" type="boolean">
+  **false** - Disables Android 14+ predictive back animations
+  
+  Set to false if your app has custom navigation transitions that conflict with the system gesture.
+</ParamField>
+
+<ParamField path="permissions" type="array">
+  Requested Android permissions:
+  - `USE_BIOMETRIC` - Fingerprint/face unlock
+  - `USE_FINGERPRINT` - Legacy fingerprint API (pre-Android 9)
+</ParamField>
+
+**Additional Android Setup**:
+
+```json
+"android": {
+  "package": "com.yourcompany.parkinmx",
+  "versionCode": 1,
+  "permissions": [
+    "android.permission.USE_BIOMETRIC",
+    "android.permission.USE_FINGERPRINT",
+    "android.permission.CAMERA",
+    "android.permission.INTERNET"
+  ]
+}
+```
+
+### Web Configuration
+
+```json app.json
+"web": {
+  "output": "static",
+  "favicon": "./assets/images/favicon.png"
+}
+```
+
+<ParamField path="output" type="string">
+  **static** - Generates static HTML files for hosting
+  
+  Alternative: `"server"` for SSR (not commonly used for Expo apps)
+</ParamField>
+
+**Web Build Command**:
+```bash
+npx expo export:web
+```
+
+Outputs to `dist/` directory, ready for deployment to:
+- Vercel
+- Netlify
+- GitHub Pages
+- Any static hosting service
+
+## Expo Plugins
+
+### Active Plugins
+
+<AccordionGroup>
+  <Accordion title="expo-router" icon="route">
+    Enables file-based routing with support for:
+    - Stack navigation
+    - Tabs navigation
+    - Modal routes
+    - Dynamic routes
+    - Deep linking
+    
+    **Entry Point**: `expo-router/entry` (set in package.json `main` field)
+  </Accordion>
+  
+  <Accordion title="expo-splash-screen" icon="image">
+    Configures the app splash screen shown during initial load.
+    
+    ```json
+    [
+      "expo-splash-screen",
+      {
+        "image": "./assets/images/splash-icon.png",
+        "imageWidth": 200,
+        "resizeMode": "contain",
+        "backgroundColor": "#ffffff",
+        "dark": {
+          "backgroundColor": "#000000"
+        }
+      }
+    ]
+    ```
+    
+    **Usage in Code**:
+    ```typescript
+    import * as SplashScreen from 'expo-splash-screen';
+    
+    SplashScreen.preventAutoHideAsync(); // Keep visible
+    
+    // Later, after loading:
+    await SplashScreen.hideAsync();
+    ```
+  </Accordion>
+  
+  <Accordion title="expo-web-browser" icon="browser">
+    Opens URLs in an in-app browser (instead of external browser).
+    
+    ```typescript
+    import * as WebBrowser from 'expo-web-browser';
+    
+    await WebBrowser.openBrowserAsync('https://parkinmx.com/terms');
+    ```
+    
+    **Benefits**:
+    - OAuth flows (keep user in app)
+    - Better UX for external links
+    - Automatic credential autofill
+  </Accordion>
+  
+  <Accordion title="expo-secure-store" icon="lock">
+    Encrypted key-value storage for sensitive data.
+    
+    **iOS**: Keychain Services
+    
+    **Android**: EncryptedSharedPreferences
+    
+    ```typescript hooks/useSeguridad.ts
+    import * as SecureStore from 'expo-secure-store';
+    
+    // Store PIN securely
+    await SecureStore.setItemAsync('userPIN', hashedPIN);
+    
+    // Retrieve
+    const storedPIN = await SecureStore.getItemAsync('userPIN');
+    ```
+  </Accordion>
+  
+  <Accordion title="expo-local-authentication" icon="fingerprint">
+    Biometric authentication (Face ID, Touch ID, fingerprint).
+    
+    ```typescript hooks/useSeguridad.ts
+    import * as LocalAuthentication from 'expo-local-authentication';
+    
+    // Check if biometrics available
+    const hasHardware = await LocalAuthentication.hasHardwareAsync();
+    const isEnrolled = await LocalAuthentication.isEnrolledAsync();
+    
+    // Authenticate
+    const result = await LocalAuthentication.authenticateAsync({
+      promptMessage: 'Authenticate to access ParkInMX',
+      fallbackLabel: 'Use PIN instead'
+    });
+    
+    if (result.success) {
+      // Proceed to app
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="expo-barcode-scanner" icon="qrcode">
+    QR code and barcode scanning.
+    
+    ```typescript components/ScannerModal.tsx
+    import { Camera } from 'expo-camera';
+    
+    const [hasPermission, setHasPermission] = useState(null);
+    
+    useEffect(() => {
+      (async () => {
+        const { status } = await Camera.requestCameraPermissionsAsync();
+        setHasPermission(status === 'granted');
+      })();
+    }, []);
+    
+    <Camera
+      onBarCodeScanned={({ data }) => {
+        console.log('Scanned:', data);
+        // Verify reservation code
+      }}
+      style={StyleSheet.absoluteFillObject}
+    />
+    ```
+  </Accordion>
+</AccordionGroup>
+
+### Other Key Expo Modules
+
+These don't require explicit plugin configuration but are used throughout the app:
+
+<CardGroup cols={2}>
+  <Card title="expo-notifications" icon="bell">
+    Push notifications (local & remote)
+  </Card>
+  <Card title="expo-image-picker" icon="image">
+    Select photos from gallery or camera
+  </Card>
+  <Card title="expo-camera" icon="camera">
+    Direct camera access for QR scanning
+  </Card>
+  <Card title="expo-haptics" icon="hand-point-up">
+    Tactile feedback (vibrations)
+  </Card>
+  <Card title="expo-blur" icon="droplet">
+    Native blur effects for iOS/Android
+  </Card>
+  <Card title="expo-print" icon="print">
+    PDF generation and printing
+  </Card>
+  <Card title="expo-sharing" icon="share-nodes">
+    Native share sheet
+  </Card>
+  <Card title="expo-constants" icon="info">
+    Access app.json and device info
+  </Card>
+</CardGroup>
+
+## Experimental Features
+
+```json app.json
+"experiments": {
+  "typedRoutes": true,
+  "reactCompiler": true
+}
+```
+
+### Typed Routes
+
+<Tip>
+  Enables TypeScript autocomplete and type checking for Expo Router navigation:
+</Tip>
+
+```typescript
+import { useRouter } from 'expo-router';
+
+const router = useRouter();
+
+// ✅ TypeScript knows these routes exist
+router.push('/reservar');
+router.push('/perfil');
+router.push({ pathname: '/EditReservationScreen', params: { id: '123' } });
+
+// ❌ TypeScript error: route doesn't exist
+router.push('/nonexistent');
+```
+
+### React Compiler
+
+<Warning>
+  **Experimental** - May have bugs or performance issues
+</Warning>
+
+Automatically optimizes React components:
+- Memoizes components without `React.memo`
+- Optimizes hooks without `useMemo`/`useCallback`
+- Reduces unnecessary re-renders
+
+**How it works**: The React Compiler analyzes your components at build time and inserts optimizations automatically.
+
+## Package.json Scripts
+
+```json package.json
+{
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web",
+    "lint": "expo lint",
+    "reset-project": "node ./scripts/reset-project.js"
+  }
+}
+```
+
+<Tabs>
+  <Tab title="Development">
+    ```bash
+    # Start development server
+    npm start
+    
+    # Start with specific platform
+    npm run android
+    npm run ios
+    npm run web
+    
+    # Clear cache and restart
+    npm start -- --clear
+    ```
+  </Tab>
+  
+  <Tab title="Production Build">
+    ```bash
+    # Build for iOS (requires macOS)
+    eas build --platform ios
+    
+    # Build for Android
+    eas build --platform android
+    
+    # Build APK for testing
+    eas build --platform android --profile preview
+    ```
+  </Tab>
+  
+  <Tab title="Linting">
+    ```bash
+    # Run ESLint
+    npm run lint
+    
+    # Auto-fix issues
+    npm run lint -- --fix
+    ```
+  </Tab>
+</Tabs>
+
+## EAS Configuration
+
+```json app.json
+"extra": {
+  "eas": {
+    "projectId": "932388e1-77d0-406c-8f32-ea382c964a89"
+  }
+}
+```
+
+**EAS (Expo Application Services)** provides:
+- Cloud builds (no Xcode/Android Studio required)
+- OTA updates
+- App submission to stores
+
+### EAS Build Profiles
+
+Create `eas.json` in project root:
+
+```json eas.json
+{
+  "cli": {
+    "version": ">= 5.2.0"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "ios": {
+        "simulator": true
+      }
+    },
+    "preview": {
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      }
+    },
+    "production": {
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_ENV": "production"
+      }
+    }
+  },
+  "submit": {
+    "production": {
+      "ios": {
+        "appleId": "your@email.com",
+        "ascAppId": "1234567890",
+        "appleTeamId": "ABCDEF1234"
+      },
+      "android": {
+        "serviceAccountKeyPath": "./google-service-account.json",
+        "track": "production"
+      }
+    }
+  }
+}
+```
+
+<Steps>
+  <Step title="Install EAS CLI">
+    ```bash
+    npm install -g eas-cli
+    ```
+  </Step>
+  <Step title="Login">
+    ```bash
+    eas login
+    ```
+  </Step>
+  <Step title="Configure Project">
+    ```bash
+    eas build:configure
+    ```
+  </Step>
+  <Step title="Build">
+    ```bash
+    # Production build
+    eas build --platform all --profile production
+    
+    # Preview APK
+    eas build --platform android --profile preview
+    ```
+  </Step>
+</Steps>
+
+## Deep Linking
+
+```json app.json
+"scheme": "parkinmx"
+```
+
+Enables opening the app via custom URLs:
+
+**Universal Links (iOS)** and **App Links (Android)** configuration:
+
+```json app.json
+"ios": {
+  "associatedDomains": [
+    "applinks:parkinmx.com"
+  ]
+},
+"android": {
+  "intentFilters": [
+    {
+      "action": "VIEW",
+      "autoVerify": true,
+      "data": [
+        {
+          "scheme": "https",
+          "host": "parkinmx.com",
+          "pathPrefix": "/"
+        }
+      ],
+      "category": [
+        "BROWSABLE",
+        "DEFAULT"
+      ]
+    }
+  ]
+}
+```
+
+**Usage**:
+```typescript
+import * as Linking from 'expo-linking';
+
+// Open app from external URL
+const url = await Linking.getInitialURL();
+if (url) {
+  const { path, queryParams } = Linking.parse(url);
+  // Navigate based on path
+}
+
+// Listen for incoming links
+Linking.addEventListener('url', ({ url }) => {
+  const { path } = Linking.parse(url);
+  router.push(path);
+});
+```
+
+## Asset Management
+
+```
+assets/
+└── images/
+    ├── icon.png                    # 1024x1024 app icon
+    ├── splash-icon.png             # Splash screen logo
+    ├── favicon.png                 # Web favicon
+    ├── android-icon-foreground.png # 432x432 adaptive icon fg
+    ├── android-icon-background.png # 432x432 adaptive icon bg
+    └── android-icon-monochrome.png # 432x432 themed icon
+```
+
+<Tip>
+  Use `expo-asset` to preload critical images:
+  
+  ```typescript
+  import { Asset } from 'expo-asset';
+  
+  await Asset.loadAsync([
+    require('./assets/images/icon.png'),
+    require('./assets/images/splash-icon.png')
+  ]);
+  ```
+</Tip>
+
+## Environment Variables
+
+Expo supports environment variables with the `EXPO_PUBLIC_` prefix:
+
+```bash .env
+EXPO_PUBLIC_API_URL=https://api.parkinmx.com
+EXPO_PUBLIC_FIREBASE_API_KEY=your_key_here
+EXPO_PUBLIC_GEMINI_API_KEY=your_gemini_key
+```
+
+**Access in code**:
+```typescript
+import Constants from 'expo-constants';
+
+const apiUrl = process.env.EXPO_PUBLIC_API_URL;
+// or
+const firebaseKey = Constants.expoConfig?.extra?.firebaseApiKey;
+```
+
+<Warning>
+  `EXPO_PUBLIC_` variables are bundled into the app and visible to users. Never store secrets here!
+</Warning>
+
+## Performance Tips
+
+<AccordionGroup>
+  <Accordion title="Enable Hermes" icon="bolt">
+    Hermes is enabled by default in Expo SDK 54+
+    
+    **Benefits**:
+    - Faster app startup
+    - Reduced memory usage
+    - Smaller app size
+  </Accordion>
+  
+  <Accordion title="Optimize Images" icon="image">
+    Use `expo-image` instead of `react-native` Image:
+    
+    ```typescript
+    import { Image } from 'expo-image';
+    
+    <Image
+      source={{ uri: photoURL }}
+      placeholder={blurhash}
+      contentFit="cover"
+      transition={200}
+    />
+    ```
+    
+    **Advantages**:
+    - Native image caching
+    - Better performance
+    - Blur hash placeholders
+  </Accordion>
+  
+  <Accordion title="Use Reanimated for Animations" icon="wand-magic-sparkles">
+    Animations run on native thread, never drop frames:
+    
+    ```typescript
+    import Animated, { useAnimatedStyle, withSpring } from 'react-native-reanimated';
+    
+    const animatedStyle = useAnimatedStyle(() => ({
+      transform: [{ scale: withSpring(scale.value) }]
+    }));
+    
+    <Animated.View style={animatedStyle} />
+    ```
+  </Accordion>
+  
+  <Accordion title="Lazy Load Screens" icon="hourglass">
+    Use dynamic imports for heavy screens:
+    
+    ```typescript
+    import { lazy, Suspense } from 'react';
+    
+    const HeavyScreen = lazy(() => import('./HeavyScreen'));
+    
+    <Suspense fallback={<LoadingSpinner />}>
+      <HeavyScreen />
+    </Suspense>
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Clear Cache">
+    ```bash
+    # Clear Metro bundler cache
+    npm start -- --clear
+    
+    # Clear node_modules and reinstall
+    rm -rf node_modules
+    npm install
+    
+    # Clear iOS build
+    cd ios && rm -rf build Pods Podfile.lock && cd ..
+    npx pod-install
+    
+    # Clear Android build
+    cd android && ./gradlew clean && cd ..
+    ```
+  </Accordion>
+  
+  <Accordion title="Plugin Configuration Issues">
+    After modifying plugins in `app.json`:
+    
+    ```bash
+    # Prebuild native projects
+    npx expo prebuild --clean
+    ```
+    
+    This regenerates `ios/` and `android/` folders with updated plugin configurations.
+  </Accordion>
+  
+  <Accordion title="Metro Bundler Errors">
+    ```bash
+    # Kill all Metro processes
+    killall -9 node
+    
+    # Restart with clear cache
+    npm start -- --reset-cache
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<Card title="Architecture Overview" icon="sitemap" href="/development/architecture">
+  Learn about the overall app architecture and tech stack
+</Card>

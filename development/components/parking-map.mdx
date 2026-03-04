@@ -1,0 +1,203 @@
+---
+title: 'ParkingMap Component'
+description: 'Interactive SVG-based parking lot visualization with real-time spot selection and occupancy tracking'
+---
+
+## Overview
+
+The `ParkingMap` component renders an interactive visual representation of a 10-spot parking lot using React Native SVG. It provides real-time occupancy status, spot selection, and visual feedback for user interactions.
+
+## Component Interface
+
+```typescript components/ParkingMap.tsx
+interface ParkingMapProps {
+  selectedSpot: string | null;
+  onSelectSpot: (spotId: string) => void;
+  occupiedSpots: string[]; // Array of occupied spot IDs
+}
+```
+
+## Props
+
+<ParamField path="selectedSpot" type="string | null" required>
+  The currently selected parking spot ID (1-10). When set, the spot is highlighted in yellow (#FFE100).
+</ParamField>
+
+<ParamField path="onSelectSpot" type="(spotId: string) => void" required>
+  Callback function invoked when a user taps an available parking spot. Receives the spot ID as a parameter. Only fires for unoccupied spots.
+</ParamField>
+
+<ParamField path="occupiedSpots" type="string[]" required>
+  Array of spot IDs that are currently occupied. Occupied spots are rendered in red (#FF4444) with reduced opacity (0.7) and display a ⛔ indicator.
+</ParamField>
+
+## Spot Layout Configuration
+
+The parking lot consists of 10 spots arranged in two columns:
+
+```typescript components/ParkingMap.tsx:20-34
+const SPOTS_LAYOUT: Spot[] = [
+  // LEFT COLUMN (Spots 1-5)
+  { id: '1', x: 20, y: 20, label: '1' },
+  { id: '2', x: 20, y: 100, label: '2' },
+  { id: '3', x: 20, y: 180, label: '3' },
+  { id: '4', x: 20, y: 260, label: '4' },
+  { id: '5', x: 20, y: 340, label: '5' },
+
+  // RIGHT COLUMN (Spots 6-10)
+  { id: '6', x: 190, y: 20, label: '6' },
+  { id: '7', x: 190, y: 100, label: '7' },
+  { id: '8', x: 190, y: 180, label: '8' },
+  { id: '9', x: 190, y: 260, label: '9' },
+  { id: '10', x: 190, y: 340, label: '10' },
+];
+```
+
+Each spot is 70x70 pixels with 8px border radius.
+
+## Visual States
+
+The component uses a color-coded system to represent spot status:
+
+```typescript components/ParkingMap.tsx:38-42
+const getSpotColor = (spotId: string, isOccupied: boolean) => {
+  if (selectedSpot === spotId) return '#FFE100'; // Yellow (Selected)
+  if (isOccupied) return '#FF4444'; // Red (Occupied)
+  return '#4CAF50'; // Green (Available)
+};
+```
+
+| State | Color | Hex Code | Behavior |
+|-------|-------|----------|----------|
+| Available | Green | `#4CAF50` | Clickable, full opacity |
+| Occupied | Red | `#FF4444` | Non-clickable, 0.7 opacity, shows ⛔ |
+| Selected | Yellow | `#FFE100` | Clickable, shows black label text |
+
+## Android Touch Handling
+
+The component implements a workaround for Android touch sensitivity issues:
+
+```typescript components/ParkingMap.tsx:104-110
+{/* Transparent overlay for reliable touch detection */}
+<Rect
+  x={spot.x}
+  y={spot.y}
+  width="70"
+  height="70"
+  fill="transparent" 
+/>
+```
+
+This transparent rectangle ensures the entire spot area is tappable, even when touching text or borders.
+
+## Usage Example
+
+```tsx
+import ParkingMap from './components/ParkingMap';
+import { useState } from 'react';
+
+function ReservationScreen() {
+  const [selectedSpot, setSelectedSpot] = useState<string | null>(null);
+  const occupiedSpots = ['2', '5', '7']; // From backend/Firestore
+
+  const handleSpotSelection = (spotId: string) => {
+    console.log(`User selected spot ${spotId}`);
+    setSelectedSpot(spotId);
+    // Proceed with reservation flow
+  };
+
+  return (
+    <ParkingMap
+      selectedSpot={selectedSpot}
+      onSelectSpot={handleSpotSelection}
+      occupiedSpots={occupiedSpots}
+    />
+  );
+}
+```
+
+## SVG Structure
+
+The component renders a 280x440px SVG canvas with:
+
+- **Background**: Dark asphalt rectangle (#333) with 15px border radius
+- **Center Lane**: Dashed white line (138px x-offset, 4px wide) running vertically
+- **Parking Spots**: Two columns of 5 spots each
+- **Entry Indicator**: Yellow "⬆ ENTRADA ⬆" text at bottom (y: 430)
+- **Legend**: Color-coded status indicators below the map
+
+## State Management
+
+The component is **controlled** - it does not manage selection state internally. Parent components must:
+
+1. Maintain `selectedSpot` state
+2. Provide `occupiedSpots` array (typically from Firestore real-time listener)
+3. Handle `onSelectSpot` callback to update state and trigger reservation logic
+
+## Interactive Behavior
+
+```typescript components/ParkingMap.tsx:62-69
+onPress={() => {
+  // Explicit check prevents selection of occupied spots
+  if (!isOccupied) {
+    onSelectSpot(spot.id);
+  }
+}}
+```
+
+- Tapping an **available** spot triggers `onSelectSpot`
+- Tapping an **occupied** spot does nothing (no callback)
+- Tapping the **selected** spot triggers `onSelectSpot` again (allows deselection if desired)
+
+## Styling
+
+The map wrapper includes elevation and shadow effects:
+
+```typescript components/ParkingMap.tsx:142-151
+mapWrapper: {
+  padding: 10,
+  backgroundColor: '#222',
+  borderRadius: 20,
+  elevation: 10,
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 5 },
+  shadowOpacity: 0.3,
+  shadowRadius: 5,
+}
+```
+
+## Legend Component
+
+The legend displays three status indicators with colored dots:
+
+- **Libre** (Available): Green dot
+- **Ocupado** (Occupied): Red dot
+- **Seleccionado** (Selected): Yellow dot
+
+Legend uses `flexWrap: 'wrap'` to ensure responsive layout on smaller screens.
+
+## Dependencies
+
+```json
+{
+  "react": "^18.x",
+  "react-native": "^0.73.x",
+  "react-native-svg": "^14.x"
+}
+```
+
+## Performance Considerations
+
+- Renders 10 spots with minimal re-renders (React.memo candidate)
+- SVG rendering is performant for static layouts
+- Touch handlers only fire on unoccupied spots
+- Consider memoizing `getSpotColor` for optimization
+
+## Accessibility
+
+The component currently lacks accessibility features. Recommended improvements:
+
+- Add `accessibilityLabel` to each spot group
+- Provide `accessibilityState` for occupied/selected states
+- Include `accessibilityHint` for interactive guidance
+- Consider text alternatives for emoji indicators

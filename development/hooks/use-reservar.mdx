@@ -1,0 +1,601 @@
+---
+title: useReservar
+description: Hook for managing parking spot reservations with real-time availability, date/time selection, and email verification
+---
+
+## Overview
+
+The `useReservar` hook provides comprehensive reservation management functionality including spot selection, date/time validation, NIP verification, email confirmation codes, and push notification scheduling. It integrates with Firebase Firestore for real-time spot availability and uses EmailJS for sending confirmation codes and tickets.
+
+## Import
+
+```typescript
+import { useReservar } from '@/hooks/useReservar';
+```
+
+## Usage
+
+```typescript
+const {
+  displayDate,
+  displayTime,
+  selectedSpot,
+  setSelectedSpot,
+  selectedVehicle,
+  setSelectedVehicle,
+  selectedCard,
+  setSelectedCard,
+  myVehicles,
+  myCards,
+  occupiedSpots,
+  handleInitiateReservation,
+  modalVisible,
+  inputCode,
+  setInputCode,
+  handleConfirmReservation,
+  loading
+} = useReservar();
+
+// Select a parking spot
+setSelectedSpot("A12");
+
+// Select vehicle and payment card
+setSelectedVehicle(myVehicles[0]);
+setSelectedCard(myCards[0]);
+
+// Initiate reservation (sends verification code)
+await handleInitiateReservation();
+
+// Confirm with the code received via email
+setInputCode("1234");
+await handleConfirmReservation();
+```
+
+## Constants
+
+<ResponseField name="HORA_APERTURA" type="number" default="7">
+  Opening hour (7:00 AM)
+</ResponseField>
+
+<ResponseField name="HORA_CIERRE" type="number" default="23">
+  Closing hour (11:00 PM)
+</ResponseField>
+
+<ResponseField name="SALDO_MINIMO" type="number" default="120">
+  Minimum credit balance required to make a reservation
+</ResponseField>
+
+## State Values
+
+### Date & Time
+
+<ResponseField name="selectedDate" type="Date">
+  Currently selected date for the reservation
+</ResponseField>
+
+<ResponseField name="selectedTime" type="Date">
+  Currently selected time for the reservation
+</ResponseField>
+
+<ResponseField name="displayDate" type="string">
+  Formatted date string in 'es-MX' locale (e.g., "04/03/2026")
+</ResponseField>
+
+<ResponseField name="displayTime" type="string">
+  Formatted time string in 12-hour format (e.g., "02:30 PM")
+</ResponseField>
+
+<ResponseField name="showDatePicker" type="boolean">
+  Controls visibility of the date picker modal
+</ResponseField>
+
+<ResponseField name="showTimePicker" type="boolean">
+  Controls visibility of the time picker modal
+</ResponseField>
+
+### Selection State
+
+<ResponseField name="selectedSpot" type="string | null">
+  ID of the currently selected parking spot (e.g., "A12")
+</ResponseField>
+
+<ResponseField name="selectedVehicle" type="object | null">
+  The vehicle object selected for this reservation
+  ```typescript
+  {
+    id: string;
+    plate: string;
+    alias?: string;
+    userId: string;
+  }
+  ```
+</ResponseField>
+
+<ResponseField name="selectedCard" type="object | null">
+  The payment card object selected for this reservation
+  ```typescript
+  {
+    id: string;
+    last4: string;
+    holderName: string;
+    type: string;
+    userId: string;
+  }
+  ```
+</ResponseField>
+
+<ResponseField name="nip" type="string[]">
+  Array of 4 strings representing the security NIP digits
+</ResponseField>
+
+### Data Collections
+
+<ResponseField name="currentCredits" type="number">
+  User's current credit balance, updated in real-time via Firestore snapshot
+</ResponseField>
+
+<ResponseField name="myVehicles" type="array">
+  Array of user's registered vehicles from Firestore
+</ResponseField>
+
+<ResponseField name="myCards" type="array">
+  Array of user's registered payment cards from Firestore
+</ResponseField>
+
+<ResponseField name="occupiedSpots" type="string[]">
+  Array of spot IDs that are currently occupied (status: "active" or "pending")
+</ResponseField>
+
+### UI State
+
+<ResponseField name="loading" type="boolean">
+  Indicates if an async operation is in progress
+</ResponseField>
+
+<ResponseField name="modalVisible" type="boolean">
+  Controls visibility of the verification code modal
+</ResponseField>
+
+<ResponseField name="generatedCode" type="string | null">
+  The 4-digit verification code sent to user's email (internal use)
+</ResponseField>
+
+<ResponseField name="inputCode" type="string">
+  User's input for the verification code
+</ResponseField>
+
+## Functions
+
+### setShowDatePicker
+
+```typescript
+setShowDatePicker: (visible: boolean) => void
+```
+
+Controls the visibility of the date picker component.
+
+### setShowTimePicker
+
+```typescript
+setShowTimePicker: (visible: boolean) => void
+```
+
+Controls the visibility of the time picker component.
+
+### onChangeDate
+
+```typescript
+onChangeDate: (event: any, date?: Date) => void
+```
+
+Handles date selection with validation:
+- Prevents selection of past dates
+- Limits reservations to maximum 4 days in advance
+- Updates both `selectedDate` and `displayDate`
+
+<ParamField path="event" type="any">
+  Event object from the date picker
+</ParamField>
+
+<ParamField path="date" type="Date" optional>
+  The selected date
+</ParamField>
+
+### onChangeTime
+
+```typescript
+onChangeTime: (event: any, time?: Date) => void
+```
+
+Handles time selection with business hours validation:
+- Enforces operating hours (7:00 AM - 11:00 PM)
+- Shows alert if time is outside business hours
+- Updates both `selectedTime` and `displayTime`
+
+<ParamField path="event" type="any">
+  Event object from the time picker
+</ParamField>
+
+<ParamField path="time" type="Date" optional>
+  The selected time
+</ParamField>
+
+### setSelectedSpot
+
+```typescript
+setSelectedSpot: (spotId: string | null) => void
+```
+
+Sets the selected parking spot ID.
+
+### setSelectedVehicle
+
+```typescript
+setSelectedVehicle: (vehicle: any | null) => void
+```
+
+Sets the selected vehicle for the reservation.
+
+### setSelectedCard
+
+```typescript
+setSelectedCard: (card: any | null) => void
+```
+
+Sets the selected payment card for the reservation.
+
+### handleNipChange
+
+```typescript
+handleNipChange: (value: string, index: number) => void
+```
+
+Updates a single digit in the NIP array.
+
+<ParamField path="value" type="string">
+  The digit value (0-9)
+</ParamField>
+
+<ParamField path="index" type="number">
+  Position in the NIP array (0-3)
+</ParamField>
+
+### handleInitiateReservation
+
+```typescript
+handleInitiateReservation: () => Promise<void>
+```
+
+Initiates the reservation process with validation and email verification:
+
+**Validation checks:**
+1. Ensures spot, vehicle, and card are selected
+2. Verifies sufficient credit balance (minimum 120 credits)
+3. Validates 4-digit NIP is complete
+4. Verifies NIP against stored security NIP in Firestore
+
+**On success:**
+- Generates a random 4-digit verification code
+- Sends code to user's email via EmailJS
+- Opens verification modal
+
+**Error handling:**
+- Shows alerts for validation failures
+- Handles email sending errors
+
+### handleConfirmReservation
+
+```typescript
+handleConfirmReservation: () => Promise<void>
+```
+
+Confirms and creates the reservation after code verification:
+
+**Process:**
+1. Validates verification code matches generated code
+2. Constructs reservation ID: `{date}_{time}_Spot{spotId}`
+3. Creates Firestore document with transaction to prevent double-booking
+4. Schedules push notification 15 minutes before reservation start
+5. Sends email ticket with QR code
+6. Navigates to home screen on success
+
+**Reservation data structure:**
+```typescript
+{
+  clientId: string;
+  startTime: Date;
+  spotId: string;
+  vehicleId: string;
+  cardId: string;
+  vehiclePlate: string;
+  cardLast4: string;
+  status: "pending";
+  createdAt: Date;
+  date: string;
+  time: string;
+  customId: string;
+}
+```
+
+### setModalVisible
+
+```typescript
+setModalVisible: (visible: boolean) => void
+```
+
+Controls the visibility of the verification code modal.
+
+### setInputCode
+
+```typescript
+setInputCode: (code: string) => void
+```
+
+Sets the user's input for the verification code.
+
+## Side Effects
+
+### Notification Permissions
+
+On mount, the hook requests notification permissions from the user to enable reservation reminders.
+
+### Real-time Credit Balance
+
+Listens to Firestore changes on the current user's document to update credit balance in real-time:
+
+```typescript
+useEffect(() => {
+  if (!auth.currentUser) return;
+  const unsub = onSnapshot(doc(db, "users", auth.currentUser.uid), (doc) => {
+    setCurrentCredits(doc.data()?.credits_balance || 0);
+  });
+  return () => unsub();
+}, []);
+```
+
+### Real-time Occupied Spots
+
+Listens to all active and pending reservations to maintain an up-to-date list of occupied spots:
+
+```typescript
+useEffect(() => {
+  const q = query(
+    collection(db, "reservations"), 
+    where("status", "in", ["active", "pending"])
+  );
+  const unsubscribe = onSnapshot(q, (snapshot) => {
+    const occupied: string[] = [];
+    snapshot.forEach((doc) => { 
+      if (doc.data().spotId) occupied.push(doc.data().spotId.toString()); 
+    });
+    setOccupiedSpots(occupied);
+  });
+  return () => unsubscribe();
+}, []);
+```
+
+### Initial Data Loading
+
+On mount, fetches user's vehicles and payment cards, and initializes date/time to current time (or opening hour if before 7 AM).
+
+## Push Notifications
+
+The hook schedules a local push notification 15 minutes before the reservation start time:
+
+```typescript
+const programarRecordatorio = async (fechaInicio: Date) => {
+  const triggerDate = new Date(fechaInicio.getTime() - 15 * 60 * 1000);
+  const now = new Date();
+  const diffInSeconds = Math.floor((triggerDate.getTime() - now.getTime()) / 1000);
+
+  if (diffInSeconds <= 0) {
+    console.log("Reserva muy próxima, no se programa alerta anticipada.");
+    return;
+  }
+
+  await Notifications.scheduleNotificationAsync({
+    content: {
+      title: "⏳ Tu reserva está por iniciar",
+      body: `Faltan 15 min para tu reserva en el cajón ${selectedSpot}. ¡Prepara tu código QR!`,
+      sound: true,
+      data: { url: '/mis-reservas' },
+    },
+    trigger: {
+      type: 'timeInterval', 
+      seconds: diffInSeconds,
+      repeats: false,
+    } as any, 
+  });
+};
+```
+
+## Email Integration
+
+Uses EmailJS to send two types of emails:
+
+### Verification Code Email
+
+Sent during `handleInitiateReservation`:
+
+```typescript
+await emailjs.send(
+  EMAILJS_SERVICE_ID, 
+  EMAILJS_TEMPLATE_ID, 
+  { 
+    to_email: userEmail, 
+    to_name: userName, 
+    view_ticket: "none", 
+    view_msg: "block", 
+    message: code, 
+    reservation_id: "NA", 
+    date: "NA", 
+    time: "NA", 
+    spot: "NA", 
+    plate: "NA"
+  }, 
+  { publicKey: EMAILJS_PUBLIC_KEY }
+);
+```
+
+### Reservation Ticket Email
+
+Sent after successful reservation:
+
+```typescript
+await emailjs.send(
+  EMAILJS_SERVICE_ID, 
+  EMAILJS_TEMPLATE_ID, 
+  {
+    to_email: userEmail, 
+    to_name: userName,
+    view_ticket: "block", 
+    view_msg: "none", 
+    reservation_id: reservationID, 
+    qr_data: qrDataEncoded, 
+    date: displayDate, 
+    time: displayTime, 
+    spot: selectedSpot, 
+    plate: selectedVehicle.plate, 
+    message: "Confirmado" 
+  }, 
+  { publicKey: EMAILJS_PUBLIC_KEY }
+);
+```
+
+## Example: Complete Reservation Flow
+
+```typescript
+function ReservationScreen() {
+  const {
+    displayDate,
+    displayTime,
+    selectedSpot,
+    setSelectedSpot,
+    selectedVehicle,
+    setSelectedVehicle,
+    selectedCard,
+    setSelectedCard,
+    myVehicles,
+    myCards,
+    occupiedSpots,
+    nip,
+    handleNipChange,
+    handleInitiateReservation,
+    modalVisible,
+    setModalVisible,
+    inputCode,
+    setInputCode,
+    handleConfirmReservation,
+    loading
+  } = useReservar();
+
+  return (
+    <View>
+      {/* Date and Time Display */}
+      <Text>Fecha: {displayDate}</Text>
+      <Text>Hora: {displayTime}</Text>
+
+      {/* Parking Map - Show available spots */}
+      <ParkingMap
+        occupiedSpots={occupiedSpots}
+        selectedSpot={selectedSpot}
+        onSelectSpot={setSelectedSpot}
+      />
+
+      {/* Vehicle Selection */}
+      <Picker
+        selectedValue={selectedVehicle?.id}
+        onValueChange={(value) => {
+          const vehicle = myVehicles.find(v => v.id === value);
+          setSelectedVehicle(vehicle);
+        }}
+      >
+        {myVehicles.map(v => (
+          <Picker.Item key={v.id} label={v.plate} value={v.id} />
+        ))}
+      </Picker>
+
+      {/* Card Selection */}
+      <Picker
+        selectedValue={selectedCard?.id}
+        onValueChange={(value) => {
+          const card = myCards.find(c => c.id === value);
+          setSelectedCard(card);
+        }}
+      >
+        {myCards.map(c => (
+          <Picker.Item key={c.id} label={`**** ${c.last4}`} value={c.id} />
+        ))}
+      </Picker>
+
+      {/* NIP Input */}
+      <View style={{ flexDirection: 'row' }}>
+        {nip.map((digit, index) => (
+          <TextInput
+            key={index}
+            value={digit}
+            onChangeText={(value) => handleNipChange(value, index)}
+            maxLength={1}
+            keyboardType="numeric"
+            secureTextEntry
+          />
+        ))}
+      </View>
+
+      {/* Initiate Button */}
+      <Button
+        title="Confirmar Reserva"
+        onPress={handleInitiateReservation}
+        disabled={loading}
+      />
+
+      {/* Verification Modal */}
+      <Modal visible={modalVisible}>
+        <Text>Ingresa el código enviado a tu email</Text>
+        <TextInput
+          value={inputCode}
+          onChangeText={setInputCode}
+          keyboardType="numeric"
+          maxLength={4}
+        />
+        <Button
+          title="Verificar"
+          onPress={handleConfirmReservation}
+          disabled={loading}
+        />
+        <Button
+          title="Cancelar"
+          onPress={() => setModalVisible(false)}
+        />
+      </Modal>
+    </View>
+  );
+}
+```
+
+## Error Handling
+
+The hook handles multiple error scenarios:
+
+- **Past dates**: Shows alert and prevents selection
+- **Dates beyond 4 days**: Shows alert with limit message
+- **Time outside business hours**: Shows alert with operating hours
+- **Insufficient credits**: Alert shown during initiation
+- **Incomplete NIP**: Alert during initiation
+- **Incorrect NIP**: Alert after validation against Firestore
+- **Wrong verification code**: Alert during confirmation
+- **Spot already taken**: Transaction fails with custom error message
+- **Email sending failures**: Logged but doesn't prevent reservation
+
+## Firebase Dependencies
+
+- **Firestore Collections**: `users`, `reservations`, `vehicles`, `cards`
+- **Authentication**: Requires authenticated user (`auth.currentUser`)
+- **Real-time Listeners**: Uses `onSnapshot` for live updates
+- **Transactions**: Uses `runTransaction` to prevent race conditions
+
+## Related Hooks
+
+- [useLogin](/development/hooks/use-login) - Authentication for accessing reservations
+- [useHistorial](/development/hooks/use-historial) - View past and active reservations
+- [useTarjetas](/development/hooks/use-tarjetas) - Manage payment cards

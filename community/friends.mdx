@@ -1,0 +1,359 @@
+---
+title: Friend System
+description: Connect with other ParkIn users, share experiences, and build your parking community
+icon: 'user-group'
+---
+
+## Overview
+
+The Friend System allows users to connect with other ParkIn community members, view their profiles, share parking experiences, and track social achievements together. The system uses Firebase's `friend_requests` collection to manage relationships and provides real-time updates.
+
+## Key Features
+
+### Three Main Tabs
+
+The Community screen (`app/AmigosScreen.tsx`) organizes social features into three tabs:
+
+<CardGroup cols={3}>
+  <Card title="Friends" icon="users">
+    View your current friends list with profile access
+  </Card>
+  <Card title="Requests" icon="inbox">
+    Manage incoming friend requests with accept/reject
+  </Card>
+  <Card title="Search" icon="magnifying-glass">
+    Discover new users and see personalized suggestions
+  </Card>
+</CardGroup>
+
+## Adding Friends
+
+### Search by Username
+
+Users can find others by searching their username:
+
+```typescript
+// From hooks/useAmigos.ts
+const searchUsers = (text: string) => {
+  const q = query(
+    collection(db, "users"), 
+    where("role", "==", "client"),
+    where("username", ">=", text),
+    where("username", "<=", text + '\uf8ff'),
+    limit(5)
+  );
+};
+```
+
+<Note>
+  Search queries include a 500ms debounce to prevent excessive Firebase calls while typing
+</Note>
+
+### QR Code Scanning
+
+For in-person connections, users can scan a friend's QR code:
+
+1. **Open Scanner**: Tap the scan icon in the Community header
+2. **Camera Permission**: App requests camera access if not granted
+3. **Scan QR**: Point camera at friend's profile QR code
+4. **Auto Navigate**: Instantly redirects to their public profile
+
+```typescript
+// From app/AmigosScreen.tsx:26
+const handleScan = (scannedId: string) => {
+  router.push({ 
+    pathname: "/PerfilPublicoScreen", 
+    params: { userId: scannedId } 
+  });
+};
+```
+
+The scanner validates QR codes using the `parkinmx:` prefix format:
+
+```typescript
+// From components/ScannerModal.tsx:27
+if (data.startsWith('parkinmx:')) {
+  const userId = data.split(':')[1];
+  onScanned(userId);
+}
+```
+
+### Friend Suggestions
+
+When not searching, users see suggested connections:
+
+- Shows up to 10 client users
+- Filters out existing friends
+- Displays current relationship status (Friends/Pending/Follow)
+
+<CodeGroup>
+```typescript Friend Status Logic
+const renderSuggestion = ({ item }: any) => {
+  const isFriend = friends.some(f => f.id === item.id);
+  const isPending = sentRequests.includes(item.id);
+  
+  // Shows "Amigos", "Pendiente", or "Seguir" button
+};
+```
+</CodeGroup>
+
+## Managing Requests
+
+### Sending Requests
+
+When sending a friend request:
+
+```typescript
+const sendFriendRequest = async (targetUserId: string) => {
+  await addDoc(collection(db, "friend_requests"), {
+    fromId: currentUid,
+    toId: targetUserId,
+    status: "pending",
+    createdAt: new Date()
+  });
+};
+```
+
+### Responding to Requests
+
+Recipients can accept or reject:
+
+<Steps>
+  <Step title="View Request">
+    Incoming requests appear in the Requests tab with sender info
+  </Step>
+  <Step title="Accept or Reject">
+    Tap checkmark to accept or X to reject
+  </Step>
+  <Step title="Update Status">
+    Accept changes status to "accepted", reject deletes the request
+  </Step>
+  <Step title="Refresh Lists">
+    Friend list automatically updates after action
+  </Step>
+</Steps>
+
+```typescript
+const respondRequest = async (requestId: string, accept: boolean) => {
+  const ref = doc(db, "friend_requests", requestId);
+  if (accept) {
+    await updateDoc(ref, { status: "accepted" });
+    Alert.alert("¡Nuevo Amigo!", "Ahora están conectados.");
+  } else {
+    await deleteDoc(ref);
+  }
+};
+```
+
+## Viewing Profiles
+
+### Public Profile Screen
+
+Tapping any user opens their public profile (`app/PerfilPublicoScreen.tsx`) showing:
+
+<CardGroup cols={2}>
+  <Card title="Profile Info" icon="id-card">
+    Avatar, username, display name, and level title
+  </Card>
+  <Card title="Level & XP" icon="chart-line">
+    Current level, total XP, and progress bar
+  </Card>
+  <Card title="Achievements" icon="trophy">
+    Unlocked badges and locked goals
+  </Card>
+  <Card title="Statistics" icon="chart-bar">
+    Reservations, clean records, cards, and friend count
+  </Card>
+</CardGroup>
+
+### Profile Actions
+
+The profile shows different actions based on relationship:
+
+- **None**: "Agregar a Amigos" button
+- **Pending**: "Solicitud Pendiente" (disabled)
+- **Accepted**: "Amigos" with checkmark
+- **Self**: No action button (viewing own profile)
+
+```typescript
+// From app/PerfilPublicoScreen.tsx:90
+const fetchFriendData = async () => {
+  if (userId === currentUid) {
+    setFriendStatus('self');
+  } else {
+    // Check for existing friend_requests
+    const q1 = query(collection(db, "friend_requests"), 
+      where("fromId", "==", currentUid), 
+      where("toId", "==", userId));
+    // Determines status: none, pending, or accepted
+  }
+};
+```
+
+## Removing Friends
+
+### Delete Confirmation
+
+Removing a friend requires confirmation:
+
+```typescript
+const confirmDelete = (friendId: string, name: string) => {
+  Alert.alert(
+    "Eliminar Amigo",
+    `¿Estás seguro de eliminar a ${name}?`,
+    [
+      { text: "Cancelar", style: "cancel" },
+      { 
+        text: "Eliminar", 
+        style: "destructive", 
+        onPress: () => removeFriend(friendId) 
+      }
+    ]
+  );
+};
+```
+
+### Bi-directional Cleanup
+
+Deletion checks both directions to ensure complete removal:
+
+```typescript
+const removeFriend = async (friendId: string) => {
+  // Query both directions
+  const q1 = query(collection(db, "friend_requests"), 
+    where("fromId", "==", currentUid), 
+    where("toId", "==", friendId));
+  const q2 = query(collection(db, "friend_requests"), 
+    where("fromId", "==", friendId), 
+    where("toId", "==", currentUid));
+  
+  // Delete all matching documents
+  const [snap1, snap2] = await Promise.all([getDocs(q1), getDocs(q2)]);
+  snap1.forEach(async d => await deleteDoc(d.ref));
+  snap2.forEach(async d => await deleteDoc(d.ref));
+};
+```
+
+## Social Achievements
+
+Friends contribute to gamification:
+
+### XP Rewards
+
+```typescript
+// From app/PerfilPublicoScreen.tsx:58
+totalXP += currentStats.friendsCount * 50; // 50 XP per friend
+```
+
+### Friend-Related Badges
+
+<CardGroup cols={2}>
+  <Card title="Primer Amigo" icon="user-plus">
+    Unlocked with 1+ friends
+  </Card>
+  <Card title="Alma de la Fiesta" icon="users">
+    Unlocked with 10+ friends
+  </Card>
+</CardGroup>
+
+```typescript
+const achievementsList = [
+  { 
+    id: 6, 
+    title: "Primer Amigo", 
+    icon: "people", 
+    color: "#2196F3", 
+    unlocked: stats.friendsCount >= 1 
+  },
+  { 
+    id: 7, 
+    title: "Alma de la Fiesta", 
+    icon: "globe", 
+    color: "#9C27B0", 
+    unlocked: stats.friendsCount >= 10 
+  }
+];
+```
+
+## Smart Avatar System
+
+All profile pictures use the `SmartAvatar` component for consistent display:
+
+```tsx
+<SmartAvatar 
+  uri={item.photoURL} 
+  userId={item.id} 
+  size={45} // Optional, defaults to 50
+/>
+```
+
+This component handles:
+- Photo URL loading
+- Fallback avatars
+- Consistent sizing across the app
+
+## Data Management
+
+### useAmigos Hook
+
+The `hooks/useAmigos.ts` hook centralizes all friend operations:
+
+```typescript
+return {
+  friends,           // Array of accepted friends
+  requests,          // Array of pending incoming requests
+  suggestions,       // Array of suggested users (filtered)
+  searchResults,     // Array of search results
+  loading,           // Boolean loading state
+  sentRequests,      // Array of outgoing request IDs
+  searchUsers,       // Function to search
+  sendFriendRequest, // Function to send request
+  respondRequest,    // Function to accept/reject
+  removeFriend,      // Function to remove friend
+  refreshData        // Function to reload all data
+};
+```
+
+### Refresh Data
+
+Users can manually refresh using the refresh icon:
+
+```typescript
+const refreshData = () => {
+  fetchFriends();
+  fetchRequests();
+};
+```
+
+<Warning>
+  The search query requires a composite index in Firebase. If users experience errors, check the Firebase console for the index creation link.
+</Warning>
+
+## UI Components
+
+### Friend Card
+
+Each friend displays:
+- Avatar (tappable to view profile)
+- Username (@username)
+- Display name
+- Delete button (trash icon)
+
+### Request Card
+
+Each request shows:
+- Sender's avatar
+- Username and "Solicitud de amistad" text
+- Reject button (red X)
+- Accept button (green checkmark)
+
+### Search/Suggestion Card
+
+Each result displays:
+- Avatar (tappable to view profile)
+- Username and display name
+- Status indicator or follow button
+
+<Info>
+  All cards are tappable to navigate to the user's public profile for more details
+</Info>

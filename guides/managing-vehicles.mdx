@@ -1,0 +1,359 @@
+---
+title: 'Managing Vehicles'
+description: 'Add, edit, and remove vehicles from your garage'
+icon: 'car-garage'
+---
+
+## Overview
+
+Your vehicle garage lets you store information about all the cars you regularly park. You can add multiple vehicles and quickly select them when making reservations.
+
+<Note>
+You must have at least one registered vehicle before you can make a parking reservation.
+</Note>
+
+## Accessing Your Garage
+
+From the main menu:
+1. Tap the hamburger menu (☰)
+2. Select **"Mi Garaje"**
+3. Your vehicle list appears with all registered cars
+
+## Adding a New Vehicle
+
+<Steps>
+  <Step title="Open Add Vehicle Form">
+    Tap the yellow **floating action button** (+ icon) in the bottom-right corner
+  </Step>
+  
+  <Step title="Fill Vehicle Details">
+    Complete the form with your vehicle information (see fields below)
+  </Step>
+  
+  <Step title="Save Vehicle">
+    Tap **"Guardar Auto"** to add the vehicle to your garage
+  </Step>
+</Steps>
+
+## Vehicle Form Fields
+
+### Required Fields
+
+<ParamField path="plate" type="string" required>
+  **License Plate / Matrícula**
+  
+  Your vehicle's license plate number. Automatically converted to uppercase and spaces are removed.
+  
+  **Examples:** `ABC-123`, `XYZ789`, `ABC 1234`
+</ParamField>
+
+<ParamField path="brand" type="string" required>
+  **Brand / Marca**
+  
+  The vehicle manufacturer.
+  
+  **Examples:** `Toyota`, `Honda`, `Ford`, `Chevrolet`
+</ParamField>
+
+### Optional Fields
+
+<ParamField path="alias" type="string">
+  **Nickname / Apodo**
+  
+  A friendly name to identify your car. If not provided, defaults to `"Brand Model"`.
+  
+  **Examples:** `"Mi Carro"`, `"El Rojo"`, `"Auto de Papá"`
+</ParamField>
+
+<ParamField path="model" type="string">
+  **Model / Modelo**
+  
+  The specific model of your vehicle.
+  
+  **Examples:** `"Corolla"`, `"Civic"`, `"F-150"`
+</ParamField>
+
+<ParamField path="color" type="string">
+  **Color**
+  
+  The primary color of your vehicle.
+  
+  **Examples:** `"Rojo"`, `"Gris"`, `"Blanco"`, `"Negro"`
+</ParamField>
+
+## Form Validation
+
+The system validates your input before saving:
+
+```typescript Source Reference
+if (!newPlate.trim() || !newBrand.trim()) {
+  Alert.alert("Falta información", "La Placa y la Marca son obligatorias.");
+  return;
+}
+```
+
+### Automatic Formatting
+
+When you save a vehicle:
+- **License Plate**: Converted to uppercase and spaces removed
+- **Text Fields**: Leading/trailing spaces trimmed
+- **Alias**: Auto-generated if empty: `"${brand} ${model}"`
+
+```typescript Source Reference
+await addDoc(collection(db, "vehicles"), {
+  userId: auth.currentUser?.uid,
+  alias: newAlias || `${newBrand} ${newModel}`,
+  plate: newPlate.toUpperCase().replace(/\s/g, ''),
+  brand: newBrand.trim(),
+  model: newModel.trim(),
+  color: newColor.trim(),
+  createdAt: new Date()
+});
+```
+
+## Vehicle Display Card
+
+Each vehicle in your garage shows:
+
+**Card Components:**
+1. **Icon Badge** (left): Yellow circular icon with car symbol
+2. **Alias**: Bold display name at the top
+3. **Details**: Brand, model, and color on second line
+4. **License Plate**: Formatted plate number in gray badge
+5. **Delete Button** (right): Trash icon to remove vehicle
+
+### Card Layout
+
+```typescript Source Reference
+<View style={styles.cardInfo}>
+  <Text style={styles.carAlias}>{item.alias}</Text>
+  
+  <Text style={styles.carDetails}>
+    {item.brand} {item.model} {item.color ? `• ${item.color}` : ''}
+  </Text>
+
+  <View style={styles.plateContainer}>
+    <Text style={styles.carPlate}>{item.plate}</Text>
+  </View>
+</View>
+```
+
+## Editing Vehicle Information
+
+<Warning>
+**Note:** Direct editing is not available in the current version. To update vehicle details:
+
+1. Delete the existing vehicle
+2. Add it again with correct information
+
+This ensures data consistency and prevents duplicate entries.
+</Warning>
+
+## Deleting a Vehicle
+
+<Steps>
+  <Step title="Locate Vehicle">
+    Find the vehicle you want to remove in your garage list
+  </Step>
+  
+  <Step title="Tap Delete Icon">
+    Tap the **trash icon** on the right side of the vehicle card
+  </Step>
+  
+  <Step title="Confirm Deletion">
+    A confirmation dialog appears: "¿Estás seguro de eliminar este auto?"
+  </Step>
+  
+  <Step title="Confirm Action">
+    Tap **"Eliminar"** to permanently remove the vehicle
+  </Step>
+</Steps>
+
+```typescript Source Reference
+const handleDelete = (id: string) => {
+  Alert.alert(
+    "Eliminar Vehículo",
+    "¿Estás seguro de eliminar este auto?",
+    [
+      { text: "Cancelar", style: "cancel" },
+      { text: "Eliminar", style: "destructive", onPress: async () => {
+        await deleteDoc(doc(db, "vehicles", id));
+        fetchVehicles();
+      }}
+    ]
+  );
+};
+```
+
+<Warning>
+**Permanent Action**: Deleting a vehicle cannot be undone. Make sure you want to remove it before confirming.
+</Warning>
+
+## Managing Multiple Vehicles
+
+You can register as many vehicles as needed. This is useful for:
+
+<CardGroup cols={2}>
+  <Card title="Family Vehicles" icon="users">
+    Add cars for different family members
+  </Card>
+  
+  <Card title="Multiple Personal Cars" icon="cars">
+    Register all vehicles you own
+  </Card>
+  
+  <Card title="Work Vehicles" icon="briefcase">
+    Add company cars or fleet vehicles
+  </Card>
+  
+  <Card title="Shared Cars" icon="handshake">
+    Include vehicles you share with others
+  </Card>
+</CardGroup>
+
+### Quick Vehicle Selection
+
+When making a reservation, all your vehicles appear in a dropdown for quick selection:
+
+```typescript Source Reference
+<SimpleSelectorModal 
+  visible={showVehiclePicker} 
+  onClose={() => setShowVehiclePicker(false)} 
+  title="Mis Vehículos" 
+  data={myVehicles} 
+  onSelect={setSelectedVehicle} 
+  renderItem={(item: any) => (
+    <Text style={styles.modalItemText}>
+      {item.alias} - {item.plate}
+    </Text>
+  )} 
+/>
+```
+
+## Empty Garage State
+
+If you haven't added any vehicles yet:
+
+**Display shows:**
+- Large car icon
+- Message: "Tu garaje está vacío"
+- Subtitle: "Agrega tu primer auto para comenzar"
+
+<Tip>
+Tap the yellow + button to add your first vehicle and start making reservations!
+</Tip>
+
+## Data Storage
+
+Vehicles are stored in Firestore under the `vehicles` collection:
+
+```typescript Source Reference
+const fetchVehicles = async () => {
+  const q = query(
+    collection(db, "vehicles"), 
+    where("userId", "==", auth.currentUser.uid)
+  );
+  const querySnapshot = await getDocs(q);
+  const cars: any[] = [];
+  querySnapshot.forEach((doc) => {
+    cars.push({ id: doc.id, ...doc.data() });
+  });
+  setVehicles(cars);
+};
+```
+
+### Vehicle Document Structure
+
+```json
+{
+  "id": "auto-generated-id",
+  "userId": "user-uid",
+  "alias": "Mi Carro",
+  "plate": "ABC123",
+  "brand": "Toyota",
+  "model": "Corolla",
+  "color": "Gris",
+  "createdAt": "2026-03-04T10:30:00Z"
+}
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Use Descriptive Aliases">
+    Give your vehicles memorable nicknames to quickly identify them when making reservations.
+    
+    **Good Examples:**
+    - "Carro Familiar"
+    - "Moto de Trabajo"
+    - "El Rojo (Honda)"
+    
+    **Avoid:**
+    - Generic names like "Auto 1", "Auto 2"
+    - Leaving alias empty (uses brand/model by default)
+  </Accordion>
+
+  <Accordion title="Keep License Plates Updated">
+    Always use current, valid license plates. Security staff may verify your plate matches the one on file.
+  </Accordion>
+
+  <Accordion title="Include Vehicle Color">
+    Adding color helps identify your vehicle in the parking lot and assists security personnel.
+  </Accordion>
+
+  <Accordion title="Remove Old Vehicles">
+    Delete vehicles you no longer own to keep your garage clean and avoid confusion when selecting vehicles.
+  </Accordion>
+</AccordionGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Cannot Save Vehicle - Missing Data">
+    **Error:** "La Placa y la Marca son obligatorias"
+    
+    **Solution:** Ensure you've filled out both the license plate and brand fields. These are required.
+  </Accordion>
+
+  <Accordion title="Vehicle Not Appearing in List">
+    **Issue:** Added vehicle doesn't show up
+    
+    **Solution:**
+    - Pull down to refresh the list
+    - Check your internet connection
+    - Restart the app
+    - Verify the vehicle was saved successfully (check for success message)
+  </Accordion>
+
+  <Accordion title="Accidental Deletion">
+    **Issue:** Deleted the wrong vehicle
+    
+    **Solution:** Unfortunately, deletions are permanent. You'll need to add the vehicle again with the correct information.
+  </Accordion>
+
+  <Accordion title="Form Not Closing After Save">
+    **Issue:** Modal stays open after tapping save
+    
+    **Solution:** Wait for the loading indicator to complete. If it persists, check your internet connection and try again.
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Make a Reservation" icon="calendar-check" href="/guides/making-reservation">
+    Use your registered vehicle to book a parking spot
+  </Card>
+  
+  <Card title="Payment Methods" icon="credit-card" href="/guides/payment-methods">
+    Add payment cards to complete reservations
+  </Card>
+  
+  <Card title="View History" icon="clock-rotate-left" href="/guides/history-tracking">
+    Track which vehicles you've used for past reservations
+  </Card>
+  
+  <Card title="Get Help" icon="headset" href="/guides/support-chat">
+    Contact support if you have vehicle-related questions
+  </Card>
+</CardGroup>

@@ -1,0 +1,406 @@
+---
+title: 'ScannerModal Component'
+description: 'QR code scanner with camera permissions, custom overlay, and user verification'
+---
+
+## Overview
+
+The `ScannerModal` component provides a full-screen QR code scanning interface for verifying user identities. It uses Expo's Camera API with a custom overlay UI and validates QR codes with the `parkinmx:` protocol.
+
+## Component Interface
+
+```typescript components/ScannerModal.tsx:6-10
+interface Props {
+  visible: boolean;
+  onClose: () => void;
+  onScanned: (userId: string) => void;
+}
+```
+
+## Props
+
+<ParamField path="visible" type="boolean" required>
+  Controls the visibility of the scanner modal. When `true`, the modal slides up and camera activates.
+</ParamField>
+
+<ParamField path="onClose" type="() => void" required>
+  Callback invoked when the user closes the scanner via the close button or back gesture.
+</ParamField>
+
+<ParamField path="onScanned" type="(userId: string) => void" required>
+  Callback invoked when a valid PARKINMX QR code is scanned. Receives the extracted user ID as a parameter.
+  
+  **Example:** If QR value is `parkinmx:abc123def456`, callback receives `"abc123def456"`.
+</ParamField>
+
+## Camera Permission Flow
+
+The component uses Expo's `useCameraPermissions` hook:
+
+```typescript components/ScannerModal.tsx:13-20
+const [permission, requestPermission] = useCameraPermissions();
+const [scanned, setScanned] = useState(false);
+
+useEffect(() => {
+  if (visible) {
+    setScanned(false); // Reset scan state when modal opens
+    if (!permission?.granted) requestPermission();
+  }
+}, [visible]);
+```
+
+### Permission States
+
+| State | Behavior |
+|-------|----------|
+| `null` | Permission not yet requested, renders empty view |
+| `undetermined` | Triggers `requestPermission()` automatically |
+| `denied` | Renders empty view (should show error message) |
+| `granted` | Camera activates and scanning begins |
+
+### Improved Permission Handling
+
+For production, add user feedback when permissions are denied:
+
+```typescript
+if (!permission?.granted) {
+  return (
+    <View style={styles.permissionContainer}>
+      <Text style={styles.permissionText}>
+        Se requiere permiso de cámara para escanear códigos QR
+      </Text>
+      <Button title="Conceder Permiso" onPress={requestPermission} />
+    </View>
+  );
+}
+```
+
+## QR Code Validation
+
+The scanner validates QR codes using a custom protocol:
+
+```typescript components/ScannerModal.tsx:23-36
+const handleBarCodeScanned = ({ data }: { data: string }) => {
+  if (scanned) return; // Prevent multiple scans
+  
+  // Verify PARKINMX protocol
+  if (data.startsWith('parkinmx:')) {
+    setScanned(true);
+    const userId = data.split(':')[1]; // Extract ID after colon
+    onScanned(userId);
+    onClose();
+  } else {
+    // Optional: Alert user of invalid QR code
+    // Alert.alert("QR Inválido", "Este código no es de un usuario de ParkIn.");
+  }
+};
+```
+
+### QR Protocol Format
+
+```
+parkinmx:<userId>
+```
+
+**Examples:**
+- Valid: `parkinmx:user123abc` → Extracts `"user123abc"`
+- Invalid: `https://example.com` → Ignored (no callback)
+- Invalid: `mayonnaise-qr-code` → Ignored (no callback)
+
+### Scan Prevention
+
+The `scanned` state prevents multiple rapid scans:
+
+```typescript components/ScannerModal.tsx:24
+if (scanned) return;
+```
+
+This flag is reset each time the modal reopens (see `useEffect` above).
+
+## Camera Configuration
+
+```tsx components/ScannerModal.tsx:45-49
+<CameraView
+  style={StyleSheet.absoluteFillObject}
+  facing="back"
+  onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
+/>
+```
+
+<ParamField path="facing" type="'back' | 'front'">
+  Camera orientation. Set to `"back"` for rear-facing camera (standard for QR scanning).
+</ParamField>
+
+<ParamField path="onBarcodeScanned" type="function | undefined">
+  Barcode detection callback. Set to `undefined` after first scan to disable further scanning until modal reopens.
+</ParamField>
+
+## Custom Scanner Overlay
+
+The component implements a custom overlay with a transparent scanning window:
+
+```tsx components/ScannerModal.tsx:51-66
+<View style={styles.overlay}>
+  {/* Top darkened area with instruction text */}
+  <View style={styles.topOverlay}>
+    <Text style={styles.text}>Escanea el QR de tu amigo</Text>
+  </View>
+  
+  {/* Middle row with transparent cutout */}
+  <View style={styles.middleRow}>
+    <View style={styles.sideOverlay} />
+    <View style={styles.cutout} />
+    <View style={styles.sideOverlay} />
+  </View>
+  
+  {/* Bottom area with close button */}
+  <View style={styles.bottomOverlay}>
+    <TouchableOpacity style={styles.closeBtn} onPress={onClose}>
+      <Ionicons name="close" size={30} color="#FFF" />
+    </TouchableOpacity>
+  </View>
+</View>
+```
+
+### Overlay Layout Structure
+
+```
+┌─────────────────────────┐
+│   Top Overlay (flex:1)  │ ← Dark background with text
+│  "Escanea el QR..."     │
+├─────────────────────────┤
+│▓│  Transparent Cutout │▓│ ← 250x250px scanning window
+│▓│     (QR goes here)  │▓│   with yellow border
+├─────────────────────────┤
+│  Bottom Overlay (flex:1)│ ← Dark background with
+│       [X] Close         │   close button
+└─────────────────────────┘
+```
+
+### Cutout Styling
+
+```typescript components/ScannerModal.tsx:78
+cutout: { 
+  width: 250, 
+  borderColor: '#FFE100', 
+  borderWidth: 2, 
+  backgroundColor: 'transparent' 
+}
+```
+
+The yellow border (#FFE100) frames the scanning area, guiding users to position the QR code correctly.
+
+## Usage Example
+
+```tsx
+import { ScannerModal } from './components/ScannerModal';
+import { useState } from 'react';
+import { Alert } from 'react-native';
+
+function AddFriendScreen() {
+  const [showScanner, setShowScanner] = useState(false);
+
+  const handleUserScanned = async (userId: string) => {
+    console.log('Scanned user ID:', userId);
+    
+    try {
+      // Add friend in Firestore
+      await addFriend(userId);
+      Alert.alert('Éxito', 'Amigo agregado correctamente');
+    } catch (error) {
+      Alert.alert('Error', 'No se pudo agregar el amigo');
+    }
+  };
+
+  return (
+    <>
+      <Button 
+        title="Escanear QR de Amigo" 
+        onPress={() => setShowScanner(true)} 
+      />
+      
+      <ScannerModal
+        visible={showScanner}
+        onClose={() => setShowScanner(false)}
+        onScanned={handleUserScanned}
+      />
+    </>
+  );
+}
+```
+
+## Integration with MyQRModal
+
+The `ScannerModal` is designed to scan QR codes generated by the `MyQRModal` component:
+
+```typescript
+// User A shows their QR code
+<MyQRModal userId="user123" userName="John" ... />
+// Generates: "parkinmx:user123"
+
+// User B scans the QR code
+<ScannerModal onScanned={(id) => console.log(id)} ... />
+// Receives: "user123"
+```
+
+## Modal Configuration
+
+```tsx components/ScannerModal.tsx:43
+<Modal animationType="slide" visible={visible} onRequestClose={onClose}>
+```
+
+<ParamField path="animationType" type="'slide'">
+  Modal transition animation. Slides up from bottom of screen.
+</ParamField>
+
+<ParamField path="onRequestClose" type="function">
+  Android back button handler. Calls `onClose()` when hardware back button is pressed.
+</ParamField>
+
+## Styling System
+
+```typescript components/ScannerModal.tsx:72-82
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: '#000' },
+  overlay: { flex: 1 },
+  topOverlay: { 
+    flex: 1, 
+    backgroundColor: 'rgba(0,0,0,0.6)', 
+    justifyContent: 'center', 
+    alignItems: 'center' 
+  },
+  middleRow: { flexDirection: 'row', height: 250 },
+  sideOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)' },
+  cutout: { 
+    width: 250, 
+    borderColor: '#FFE100', 
+    borderWidth: 2, 
+    backgroundColor: 'transparent' 
+  },
+  bottomOverlay: { 
+    flex: 1, 
+    backgroundColor: 'rgba(0,0,0,0.6)', 
+    alignItems: 'center', 
+    paddingTop: 30 
+  },
+  text: { 
+    color: '#FFF', 
+    fontSize: 18, 
+    fontWeight: 'bold', 
+    marginTop: 40 
+  },
+  closeBtn: { 
+    backgroundColor: 'rgba(255,255,255,0.2)', 
+    padding: 15, 
+    borderRadius: 50 
+  }
+});
+```
+
+## Dependencies
+
+```json
+{
+  "react": "^18.x",
+  "react-native": "^0.73.x",
+  "expo-camera": "^14.x",
+  "@expo/vector-icons": "^13.x"
+}
+```
+
+## Camera API Migration
+
+<Note>
+  The component uses `CameraView` from Expo Camera v14+. Older versions used the `Camera` component:
+  
+  ```typescript
+  // Old (deprecated)
+  import { Camera } from 'expo-camera';
+  
+  // New (current)
+  import { CameraView } from 'expo-camera';
+  ```
+</Note>
+
+## State Management
+
+The component maintains minimal internal state:
+
+```typescript
+const [scanned, setScanned] = useState(false);
+```
+
+This boolean prevents duplicate scans until the modal is reopened.
+
+## Error Handling
+
+Currently, invalid QR codes are silently ignored. For better UX, uncomment the alert:
+
+```typescript components/ScannerModal.tsx:33-34
+} else {
+  Alert.alert("QR Inválido", "Este código no es de un usuario de ParkIn.");
+}
+```
+
+Or implement a custom error toast:
+
+```typescript
+import { ToastAndroid } from 'react-native';
+
+ToastAndroid.show('QR code no válido', ToastAndroid.SHORT);
+```
+
+## Performance Considerations
+
+- Camera stream runs continuously while modal is open
+- `onBarcodeScanned` is set to `undefined` after first scan to reduce processing
+- Modal unmounts camera when `visible={false}`, freeing resources
+
+## Security Considerations
+
+1. **Protocol Validation**: Always validate the `parkinmx:` prefix to prevent malicious QR codes
+2. **User ID Verification**: After extracting user ID, verify it exists in Firestore before performing actions
+3. **Rate Limiting**: Consider implementing rate limiting on friend requests to prevent abuse
+
+```typescript
+const handleUserScanned = async (userId: string) => {
+  // Verify user exists
+  const userDoc = await getDoc(doc(db, 'users', userId));
+  if (!userDoc.exists()) {
+    Alert.alert('Error', 'Usuario no encontrado');
+    return;
+  }
+  
+  // Proceed with friend request
+  await addFriend(userId);
+};
+```
+
+## Accessibility
+
+Recommended accessibility improvements:
+
+```tsx
+<TouchableOpacity
+  style={styles.closeBtn}
+  onPress={onClose}
+  accessible={true}
+  accessibilityLabel="Cerrar escáner"
+  accessibilityRole="button"
+>
+  <Ionicons name="close" size={30} color="#FFF" />
+</TouchableOpacity>
+```
+
+Add VoiceOver/TalkBack announcements:
+
+```typescript
+import { AccessibilityInfo } from 'react-native';
+
+const handleBarCodeScanned = ({ data }: { data: string }) => {
+  if (data.startsWith('parkinmx:')) {
+    AccessibilityInfo.announce('Código QR escaneado correctamente');
+    // ... rest of logic
+  }
+};
+```

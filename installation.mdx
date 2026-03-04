@@ -1,0 +1,819 @@
+---
+title: Installation Guide
+description: Detailed installation instructions for iOS, Android, and Web platforms including system requirements and troubleshooting
+---
+
+# Installing PARKINMX
+
+This comprehensive guide covers installation on all supported platforms: iOS, Android, and Web. Choose your platform below for detailed instructions.
+
+## System Requirements
+
+Before installing, ensure your device meets these minimum requirements:
+
+<Tabs>
+  <Tab title="iOS">
+    ### iOS Requirements
+    
+    - **iOS Version**: 13.0 or later
+    - **Devices**: iPhone, iPad, iPod touch
+    - **Storage**: Minimum 100 MB free space
+    - **Internet**: WiFi or cellular data connection
+    - **Optional**: Touch ID or Face ID for biometric login
+    
+    #### Compatible Devices
+    - iPhone 6s and newer
+    - iPad Air 2 and newer
+    - iPad mini 4 and newer
+    - iPad Pro (all models)
+    - iPod touch (7th generation)
+    
+    <Note>
+      PARKINMX supports both portrait and landscape orientations on iPad.
+    </Note>
+  </Tab>
+  
+  <Tab title="Android">
+    ### Android Requirements
+    
+    - **Android Version**: 5.0 (Lollipop) or later
+    - **Storage**: Minimum 100 MB free space
+    - **RAM**: Minimum 2 GB recommended
+    - **Internet**: WiFi or mobile data connection
+    - **Optional**: Fingerprint sensor for biometric login
+    
+    #### Permissions Required
+    The app requests these permissions:
+    - `USE_BIOMETRIC` - For fingerprint/face authentication
+    - `USE_FINGERPRINT` - Legacy fingerprint support
+    - `CAMERA` - For QR code scanning (granted at runtime)
+    - `INTERNET` - For app functionality
+    
+    <Tip>
+      PARKINMX is optimized for edge-to-edge displays and supports Android's predictive back gesture.
+    </Tip>
+  </Tab>
+  
+  <Tab title="Web">
+    ### Web Requirements
+    
+    - **Browsers**: Chrome 90+, Safari 14+, Firefox 88+, Edge 90+
+    - **Internet**: Stable broadband or mobile connection
+    - **Screen**: Minimum 320px width (mobile responsive)
+    - **JavaScript**: Must be enabled
+    
+    #### Recommended Specifications
+    - Modern browser with ES6+ support
+    - 2 GB RAM or more
+    - Stable connection (3G minimum, 4G/WiFi recommended)
+    
+    <Note>
+      The web version is a Progressive Web App (PWA) and can be installed to your home screen for a native-like experience.
+    </Note>
+  </Tab>
+</Tabs>
+
+## Platform Installation
+
+<Tabs>
+  <Tab title="iOS">
+    ## Installing on iOS
+    
+    <Steps>
+      <Step title="Open App Store">
+        1. Locate and tap the **App Store** icon on your home screen
+        2. The App Store app is pre-installed on all iOS devices
+        
+        <Tip>
+          Make sure you're signed in with your Apple ID before downloading apps.
+        </Tip>
+      </Step>
+      
+      <Step title="Search for PARKINMX">
+        1. Tap the **Search** tab at the bottom of the screen
+        2. Type **"PARKINMX"** in the search bar
+        3. Tap **Search** on the keyboard
+        4. Look for the PARKINMX app with the yellow and black icon
+        
+        <Note>
+          The app icon features the PARKINMX logo on a light blue background (`#E6F4FE`).
+        </Note>
+      </Step>
+      
+      <Step title="Download the App">
+        1. Tap the **Get** button next to PARKINMX
+        2. Authenticate with Face ID, Touch ID, or Apple ID password
+        3. The button changes to show download progress
+        4. Wait for installation to complete (typically 30-60 seconds)
+        
+        The app will automatically appear on your home screen when installation is complete.
+      </Step>
+      
+      <Step title="Launch and Set Up">
+        1. Tap the **PARKINMX** icon on your home screen
+        2. You'll see the splash screen with the PARKINMX logo
+        3. After 2 seconds, you'll be taken to the login screen
+        4. Choose **"Regístrate"** to create a new account or **"ENTRAR"** to log in
+        
+        ### First Launch Permissions
+        
+        On first launch, the app may request:
+        
+        - **Notifications**: Tap "Allow" to receive reservation updates and reminders
+        - **Camera** (when needed): Required for QR code scanning at parking facilities
+        - **Biometric Authentication**: Set up Touch ID or Face ID for quick login
+        
+        <Warning>
+          Grant camera permission when prompted - it's essential for scanning parking QR codes.
+        </Warning>
+      </Step>
+      
+      <Step title="Configure Biometric Login (Optional)">
+        Enable Face ID or Touch ID for faster authentication:
+        
+        1. After first login, tap **"Enable Biometric Login"** when prompted
+        2. Follow the on-screen instructions
+        3. Your biometric data is stored securely on-device only
+        
+        **Supported methods:**
+        - **Face ID** - iPhone X and newer, iPad Pro (2018+)
+        - **Touch ID** - iPhone 5s through iPhone 8, iPad with Home button
+      </Step>
+    </Steps>
+    
+    ## iOS-Specific Features
+    
+    PARKINMX takes full advantage of iOS capabilities:
+    
+    <CardGroup cols={2}>
+      <Card title="Face ID / Touch ID" icon="fingerprint">
+        Biometric authentication using Apple's secure enclave. Your biometric data never leaves your device.
+      </Card>
+      
+      <Card title="iPad Optimization" icon="tablet">
+        Full tablet support with adaptive layouts. Use PARKINMX in Split View or Slide Over multitasking.
+      </Card>
+      
+      <Card title="Dynamic Type" icon="text-size">
+        Respects iOS system font size preferences for better accessibility.
+      </Card>
+      
+      <Card title="Dark Mode" icon="moon">
+        Automatically switches between light and dark themes based on system settings.
+      </Card>
+    </CardGroup>
+    
+    ## Troubleshooting iOS Installation
+    
+    <Accordion title="App Store says 'Cannot Download'">
+      **Solutions:**
+      1. Check your internet connection (try WiFi instead of cellular)
+      2. Ensure you have enough storage space (Settings → General → iPhone Storage)
+      3. Sign out and back into App Store (Settings → Your Name → Media & Purchases)
+      4. Restart your device
+      5. Update iOS to the latest version (Settings → General → Software Update)
+    </Accordion>
+    
+    <Accordion title="Face ID / Touch ID not working">
+      **Check these settings:**
+      1. Go to Settings → Face ID & Passcode (or Touch ID & Passcode)
+      2. Ensure PARKINMX is listed and enabled
+      3. Try disabling and re-enabling biometric login in the app
+      4. Make sure your device's biometric sensor is clean and unobstructed
+    </Accordion>
+    
+    <Accordion title="App crashes on launch">
+      **Try these fixes:**
+      1. Force close the app (swipe up from bottom or double-click Home)
+      2. Restart your device
+      3. Delete and reinstall the app
+      4. Check if iOS update is available
+      5. Report the issue via GitHub if problem persists
+    </Accordion>
+    
+    <Accordion title="Camera permission denied">
+      **To grant camera access:**
+      1. Open Settings → Privacy & Security → Camera
+      2. Find PARKINMX in the list
+      3. Toggle the switch to ON (green)
+      4. Relaunch PARKINMX
+    </Accordion>
+  </Tab>
+  
+  <Tab title="Android">
+    ## Installing on Android
+    
+    <Steps>
+      <Step title="Open Google Play Store">
+        1. Locate and tap the **Google Play Store** icon in your app drawer
+        2. The Play Store is pre-installed on most Android devices
+        3. Ensure you're signed in with your Google account
+        
+        <Note>
+          Some devices may have alternative app stores. PARKINMX is distributed through Google Play Store.
+        </Note>
+      </Step>
+      
+      <Step title="Search for PARKINMX">
+        1. Tap the **search bar** at the top of the screen
+        2. Type **"PARKINMX"**
+        3. Tap the search icon or press Enter
+        4. Select the PARKINMX app from search results
+        
+        **App Identifier:**
+        - Package: `com.alejandromv03.parkinmx`
+        - Developer: alejandromv03
+      </Step>
+      
+      <Step title="Install the Application">
+        1. Tap the green **Install** button
+        2. Review the permissions requested
+        3. Tap **Accept** to begin download
+        4. Wait for installation to complete (30-90 seconds depending on connection)
+        
+        The app icon will appear in your app drawer when ready.
+        
+        <Warning>
+          The app requires approximately 50-100 MB download. Use WiFi to avoid cellular data charges.
+        </Warning>
+      </Step>
+      
+      <Step title="Grant Initial Permissions">
+        When you first open PARKINMX, you'll be asked to grant permissions:
+        
+        **Required at installation:**
+        - `USE_BIOMETRIC` - For fingerprint authentication
+        - `USE_FINGERPRINT` - Legacy fingerprint support
+        
+        **Requested at runtime (when needed):**
+        - **Camera** - When you scan a QR code
+        - **Notifications** - For reservation alerts
+        
+        <Tip>
+          You can change permissions later in Settings → Apps → PARKINMX → Permissions.
+        </Tip>
+      </Step>
+      
+      <Step title="First Launch Setup">
+        1. Tap the PARKINMX icon to launch
+        2. Watch the 2-second splash screen
+        3. Arrive at the login screen
+        4. Tap **"Regístrate"** to create your account
+        
+        ### Enable Biometric Authentication
+        
+        After first login, set up fingerprint or face unlock:
+        
+        1. Tap **"Enable Biometric Login"** when prompted
+        2. Follow your device's biometric setup
+        3. Test the biometric login by logging out and back in
+        
+        **Supported biometric methods:**
+        - Fingerprint sensor
+        - Face unlock (on supported devices)
+        - Iris scanner (on Samsung devices)
+      </Step>
+    </Steps>
+    
+    ## Android-Specific Features
+    
+    <CardGroup cols={2}>
+      <Card title="Adaptive Icons" icon="shapes">
+        Dynamic app icons that adapt to your device's icon shape and theme. Includes monochrome variant for themed icons.
+      </Card>
+      
+      <Card title="Edge-to-Edge Display" icon="mobile">
+        Full immersive experience using the entire screen, including notch and camera cutout areas.
+      </Card>
+      
+      <Card title="Predictive Back Gesture" icon="arrow-left">
+        Smooth back navigation with visual preview of where you'll go when swiping back.
+      </Card>
+      
+      <Card title="Dark Mode" icon="moon">
+        Automatic theme switching based on system settings. Battery-friendly OLED optimizations.
+      </Card>
+    </CardGroup>
+    
+    ## Android Version Compatibility
+    
+    PARKINMX is tested on these Android versions:
+    
+    | Android Version | Codename | Support Status |
+    |-----------------|----------|----------------|
+    | 13+ | Tiramisu & newer | ✅ Fully supported |
+    | 10-12 | Q, R, S | ✅ Fully supported |
+    | 8-9 | Oreo, Pie | ✅ Supported |
+    | 5-7 | Lollipop, Marshmallow, Nougat | ⚠️ Basic support |
+    | < 5 | KitKat and older | ❌ Not supported |
+    
+    <Note>
+      Some advanced features may be limited on Android 5-7. Update to Android 8+ for the best experience.
+    </Note>
+    
+    ## Troubleshooting Android Installation
+    
+    <Accordion title="Play Store won't download the app">
+      **Common solutions:**
+      1. Clear Play Store cache: Settings → Apps → Play Store → Storage → Clear Cache
+      2. Check internet connection (switch between WiFi and mobile data)
+      3. Ensure sufficient storage space (Settings → Storage)
+      4. Update Google Play Store to latest version
+      5. Remove and re-add your Google account
+      6. Restart your device
+    </Accordion>
+    
+    <Accordion title="Installation pending or stuck">
+      **Try these steps:**
+      1. Open Play Store → Menu → My apps & games
+      2. Find PARKINMX in the queue
+      3. Tap to cancel and retry
+      4. Clear Play Store data: Settings → Apps → Play Store → Storage → Clear Data
+      5. Reboot device and try again
+    </Accordion>
+    
+    <Accordion title="Fingerprint authentication not working">
+      **Check settings:**
+      1. Go to Settings → Security → Fingerprint
+      2. Ensure fingerprint is enrolled
+      3. In PARKINMX, go to Menu → Security
+      4. Toggle biometric login off and on again
+      5. Make sure sensor is clean and dry
+    </Accordion>
+    
+    <Accordion title="Camera permission denied">
+      **To manually grant camera access:**
+      1. Open Settings → Apps → PARKINMX
+      2. Tap **Permissions**
+      3. Find **Camera** and tap it
+      4. Select **Allow** or **Allow only while using the app**
+      5. Return to PARKINMX and try again
+    </Accordion>
+    
+    <Accordion title="App not compatible with device">
+      **Possible reasons:**
+      - Your Android version is below 5.0
+      - Your device architecture is not supported (very rare)
+      - Regional restrictions (contact support)
+      
+      **Solutions:**
+      1. Update Android to the latest available version
+      2. Check device specifications
+      3. Try sideloading (advanced users only)
+    </Accordion>
+    
+    ## Installing from APK (Advanced)
+    
+    If Play Store is unavailable, you can install via APK:
+    
+    <Warning>
+      Only download APKs from official sources. Installing from untrusted sources poses security risks.
+    </Warning>
+    
+    <Steps>
+      <Step title="Download APK">
+        Download the official PARKINMX APK from:
+        - GitHub releases
+        - Official website
+        - Expo build artifacts (if you have access)
+      </Step>
+      
+      <Step title="Enable Unknown Sources">
+        1. Go to Settings → Security
+        2. Enable **"Install from Unknown Sources"** or **"Install Unknown Apps"**
+        3. Grant permission to your browser or file manager
+      </Step>
+      
+      <Step title="Install APK">
+        1. Open the downloaded APK file
+        2. Tap **Install**
+        3. Wait for installation to complete
+        4. Tap **Open** to launch
+      </Step>
+    </Steps>
+  </Tab>
+  
+  <Tab title="Web">
+    ## Using PARKINMX on Web
+    
+    The web version provides full functionality without requiring installation.
+    
+    <Steps>
+      <Step title="Access the Web App">
+        1. Open your preferred web browser
+        2. Navigate to your PARKINMX deployment URL
+        3. Bookmark the page for quick access
+        
+        **Supported Browsers:**
+        - ✅ Chrome 90+
+        - ✅ Safari 14+
+        - ✅ Firefox 88+
+        - ✅ Edge 90+
+        - ✅ Opera 76+
+        - ⚠️ Internet Explorer: Not supported
+        
+        <Note>
+          The web version is built as a static Progressive Web App (PWA) using Expo's web output.
+        </Note>
+      </Step>
+      
+      <Step title="Install as PWA (Optional)">
+        For a native app-like experience, install PARKINMX to your home screen:
+        
+        <Tabs>
+          <Tab title="Chrome (Desktop)">
+            1. Click the **install icon** (⊕) in the address bar
+            2. Click **Install** in the dialog
+            3. PARKINMX opens in its own window
+            4. Access from your taskbar or desktop shortcut
+          </Tab>
+          
+          <Tab title="Safari (iOS)">
+            1. Tap the **Share** button (square with arrow)
+            2. Scroll down and tap **"Add to Home Screen"**
+            3. Edit the name if desired
+            4. Tap **Add**
+            5. PARKINMX appears as an app icon on your home screen
+          </Tab>
+          
+          <Tab title="Chrome (Android)">
+            1. Tap the **menu** (⋮) in the top-right
+            2. Select **"Add to Home Screen"** or **"Install App"**
+            3. Confirm the installation
+            4. The app icon appears in your app drawer
+          </Tab>
+          
+          <Tab title="Firefox">
+            1. Click the **menu** (☰) button
+            2. Select **"Install Site"** or **"Add to Home Screen"**
+            3. Confirm the installation
+          </Tab>
+        </Tabs>
+        
+        <Tip>
+          PWA installation gives you offline access to previously loaded content and faster load times.
+        </Tip>
+      </Step>
+      
+      <Step title="Create Your Account">
+        1. On the login screen, click **"Regístrate"**
+        2. Fill in your email, username, and password
+        3. Click **REGISTRARSE**
+        4. Verify your email if prompted
+        
+        The web version uses the same Firebase backend as mobile apps - your account works across all platforms.
+      </Step>
+      
+      <Step title="Enable Browser Features">
+        For the best experience, enable these browser features:
+        
+        **Notifications:**
+        - Click **Allow** when prompted for notifications
+        - Or enable in browser settings: Site Settings → Notifications
+        
+        **Location (for "Get Directions"):**
+        - Allow location access when prompted
+        - Required for the "Cómo llegar" (directions) feature
+        
+        **Camera (for QR scanning):**
+        - Grant camera permission when scanning QR codes
+        - Check browser settings if camera doesn't work
+      </Step>
+    </Steps>
+    
+    ## Web-Specific Features
+    
+    <CardGroup cols={2}>
+      <Card title="Responsive Design" icon="mobile-screen">
+        Fully responsive layout that adapts from mobile (320px) to desktop (1920px+) screens.
+      </Card>
+      
+      <Card title="Cross-Device Sync" icon="rotate">
+        Changes sync in real-time across all your devices via Firebase.
+      </Card>
+      
+      <Card title="No Installation Required" icon="cloud">
+        Access instantly from any device with a browser. No storage space needed.
+      </Card>
+      
+      <Card title="Automatic Updates" icon="arrows-rotate">
+        Always use the latest version - updates are instant and automatic.
+      </Card>
+    </CardGroup>
+    
+    ## Browser Compatibility Details
+    
+    ### Required Browser Features
+    
+    PARKINMX web requires these modern browser capabilities:
+    
+    ```javascript Browser Features
+    // Required JavaScript features (ES6+)
+    - Arrow functions
+    - Async/await
+    - Promises
+    - Template literals
+    - Destructuring
+    - Modules (import/export)
+    
+    // Required Web APIs
+    - Fetch API
+    - LocalStorage
+    - SessionStorage
+    - Geolocation API (for directions)
+    - Camera API (for QR scanning)
+    - Notifications API (for alerts)
+    ```
+    
+    ### Performance Optimization
+    
+    The web version includes:
+    - Code splitting for faster initial load
+    - Asset optimization and compression
+    - Service worker for offline support
+    - Lazy loading of images and components
+    
+    ## Troubleshooting Web Access
+    
+    <Accordion title="Page won't load or shows blank screen">
+      **Solutions:**
+      1. Clear browser cache and cookies
+      2. Hard refresh: Ctrl+Shift+R (Windows) or Cmd+Shift+R (Mac)
+      3. Disable browser extensions temporarily
+      4. Try incognito/private mode
+      5. Update browser to latest version
+      6. Try a different browser
+    </Accordion>
+    
+    <Accordion title="Features not working as expected">
+      **Check these items:**
+      1. JavaScript is enabled (it must be on)
+      2. No aggressive ad blockers interfering
+      3. Browser is up to date
+      4. Stable internet connection
+      5. Console errors (F12 → Console tab)
+    </Accordion>
+    
+    <Accordion title="Camera/QR scanner not working">
+      **Common issues:**
+      1. Camera permission was denied:
+         - Chrome: Click the lock icon in address bar → Site Settings → Camera → Allow
+         - Safari: Safari menu → Settings for This Website → Camera → Allow
+      2. Camera is in use by another app
+      3. Browser doesn't support getUserMedia API (very old browsers)
+      4. Try HTTPS connection (camera requires secure context)
+    </Accordion>
+    
+    <Accordion title="Can't receive notifications">
+      **Enable notifications:**
+      1. Check site permissions: Browser settings → Site Settings → Notifications
+      2. Ensure notifications are not blocked at OS level
+      3. Re-grant permission: Click the bell icon when prompted
+      4. Check browser notification settings
+    </Accordion>
+    
+    <Accordion title="Slow performance on web">
+      **Optimization tips:**
+      1. Close unnecessary browser tabs
+      2. Clear browser cache
+      3. Disable heavy browser extensions
+      4. Check your internet speed
+      5. Use a modern browser (Chrome/Safari/Firefox latest)
+      6. Close other applications using memory
+    </Accordion>
+    
+    ## Desktop App Experience
+    
+    When installed as a PWA on desktop:
+    
+    - **Standalone window** - Runs in its own window without browser UI
+    - **Dock/Taskbar icon** - Quick access like a native app
+    - **Keyboard shortcuts** - Standard shortcuts work (Cmd+R refresh, etc.)
+    - **Notifications** - System-level notifications when app is closed
+    - **Offline mode** - Previously loaded data available without internet
+  </Tab>
+</Tabs>
+
+## Post-Installation Setup
+
+After installing on any platform, complete these initial setup steps:
+
+<Steps>
+  <Step title="Create Account">
+    Register with email, username, and password. See [Quick Start Guide](/quickstart#create-your-account) for details.
+  </Step>
+  
+  <Step title="Add Vehicle">
+    Add at least one vehicle to your garage. See [Managing Vehicles](/guides/managing-vehicles) guide.
+  </Step>
+  
+  <Step title="Set Up Payment">
+    Add a payment method or load wallet balance. See [Payment Methods](/guides/payment-methods) guide.
+  </Step>
+  
+  <Step title="Configure Security PIN">
+    Create your 4-digit transaction PIN in Wallet → Security settings.
+  </Step>
+  
+  <Step title="Enable Notifications">
+    Allow notifications to receive reservation updates and reminders.
+  </Step>
+</Steps>
+
+## Development Installation
+
+For developers wanting to run PARKINMX locally:
+
+<Accordion title="Development Setup">
+  ### Prerequisites
+  
+  ```bash
+  # Required software
+  - Node.js 18+ and npm
+  - Expo CLI
+  - iOS: Xcode 14+ (Mac only)
+  - Android: Android Studio with SDK
+  ```
+  
+  ### Clone and Install
+  
+  ```bash
+  # Clone the repository
+  git clone https://github.com/AlejandroMV03/PARKINMX.git
+  cd PARKINMX
+  
+  # Install dependencies
+  npm install
+  ```
+  
+  ### Configure Firebase
+  
+  1. Create a Firebase project
+  2. Add your Firebase config
+  3. Enable Authentication and Firestore
+  
+  ### Run Development Server
+  
+  ```bash
+  # Start Expo dev server
+  npm start
+  
+  # Or run on specific platform
+  npm run ios      # iOS simulator
+  npm run android  # Android emulator
+  npm run web      # Web browser
+  ```
+  
+  See [Development → Architecture](/development/architecture) for complete development setup.
+</Accordion>
+
+## Updating PARKINMX
+
+<Tabs>
+  <Tab title="iOS">
+    Updates are managed through the App Store:
+    
+    1. Open **App Store**
+    2. Tap your **profile icon** (top right)
+    3. Scroll to **Available Updates**
+    4. Find PARKINMX and tap **Update**
+    
+    Or enable automatic updates:
+    - Settings → App Store → App Updates → ON
+  </Tab>
+  
+  <Tab title="Android">
+    Updates via Google Play Store:
+    
+    1. Open **Play Store**
+    2. Tap **Menu → My apps & games**
+    3. Find PARKINMX in the update list
+    4. Tap **Update**
+    
+    Or enable auto-updates:
+    - Play Store → Menu → Settings → Auto-update apps → Over Wi-Fi only
+  </Tab>
+  
+  <Tab title="Web">
+    Web version updates automatically:
+    
+    - Refresh the page to get the latest version
+    - Service worker updates in background
+    - No manual action required
+  </Tab>
+</Tabs>
+
+## Uninstalling PARKINMX
+
+If you need to remove the app:
+
+<Tabs>
+  <Tab title="iOS">
+    1. Long-press the PARKINMX icon on home screen
+    2. Tap **Remove App**
+    3. Choose **Delete App**
+    4. Confirm deletion
+    
+    Your account data remains on Firebase servers. Reinstalling restores your data.
+  </Tab>
+  
+  <Tab title="Android">
+    1. Go to Settings → Apps → PARKINMX
+    2. Tap **Uninstall**
+    3. Confirm uninstallation
+    
+    Or long-press the app icon and drag to **Uninstall**.
+    
+    Your account data is preserved on servers.
+  </Tab>
+  
+  <Tab title="Web">
+    **For installed PWA:**
+    1. Open the app
+    2. Click menu (⋮) → Uninstall
+    
+    **For bookmark:**
+    - Simply delete the bookmark
+    
+    To delete account data, contact support.
+  </Tab>
+</Tabs>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Quick Start Guide" icon="rocket" href="/quickstart">
+    Complete the setup and make your first reservation in 5 minutes.
+  </Card>
+  
+  <Card title="Feature Overview" icon="grid" href="/features/reservations">
+    Explore all PARKINMX features and capabilities.
+  </Card>
+  
+  <Card title="User Guides" icon="book" href="/guides/making-reservation">
+    Detailed guides for using every feature of PARKINMX.
+  </Card>
+  
+  <Card title="Support" icon="headset" href="/guides/support-chat">
+    Get help if you encounter any issues during installation.
+  </Card>
+</CardGroup>
+
+## Technical Details
+
+<Accordion title="App Configuration (app.json)">
+  ```json
+  {
+    "expo": {
+      "name": "parkinmx",
+      "slug": "parkinmx",
+      "version": "1.0.0",
+      "scheme": "parkinmx",
+      "newArchEnabled": true,
+      "ios": {
+        "supportsTablet": true
+      },
+      "android": {
+        "permissions": [
+          "android.permission.USE_BIOMETRIC",
+          "android.permission.USE_FINGERPRINT"
+        ],
+        "edgeToEdgeEnabled": true
+      },
+      "plugins": [
+        "expo-router",
+        "expo-secure-store",
+        "expo-local-authentication",
+        "expo-barcode-scanner"
+      ]
+    }
+  }
+  ```
+</Accordion>
+
+<Accordion title="Dependencies & Versions">
+  Key packages used in PARKINMX:
+  
+  ```json
+  {
+    "expo": "~54.0.27",
+    "react": "19.1.0",
+    "react-native": "0.81.5",
+    "expo-router": "~6.0.17",
+    "firebase": "^12.6.0",
+    "expo-local-authentication": "~17.0.8",
+    "expo-barcode-scanner": "^13.0.1",
+    "expo-secure-store": "~15.0.8"
+  }
+  ```
+  
+  See [Development → Expo Configuration](/development/expo-configuration) for full dependency list.
+</Accordion>
+
+<Warning>
+  Keep your app updated to the latest version for security patches, bug fixes, and new features.
+</Warning>
+
+---
+
+Installation complete? Head to the [Quick Start Guide](/quickstart) to begin using PARKINMX!

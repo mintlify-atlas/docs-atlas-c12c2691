@@ -1,0 +1,446 @@
+---
+title: 'Push Notifications'
+description: 'Real-time alerts for reservations, reminders, and system updates'
+icon: 'bell'
+---
+
+## Overview
+
+The notification system provides real-time alerts for reservation reminders, payment confirmations, and system updates. Notifications use Expo's push notification service with automatic token management.
+
+## Notification Setup
+
+### Permission Requests
+
+The app requests notification permissions on startup:
+
+```typescript
+import * as Notifications from 'expo-notifications';
+
+useEffect(() => {
+  const pedirPermisos = async () => {
+    const { status } = await Notifications.getPermissionsAsync();
+    if (status !== 'granted') {
+      await Notifications.requestPermissionsAsync();
+    }
+  };
+  pedirPermisos();
+}, []);
+```
+
+<Note>
+  Permissions are required for both local and push notifications. Users can revoke these in system settings.
+</Note>
+
+### Notification Handler
+
+Configure how notifications are displayed:
+
+```typescript
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+    shouldShowBanner: true,
+    shouldShowList: true,
+  }),
+});
+```
+
+<AccordionGroup>
+  <Accordion title="shouldShowAlert">
+    Display notification when app is in foreground
+  </Accordion>
+  <Accordion title="shouldPlaySound">
+    Play notification sound
+  </Accordion>
+  <Accordion title="shouldSetBadge">
+    Update app icon badge (disabled to avoid clutter)
+  </Accordion>
+  <Accordion title="shouldShowBanner">
+    Show banner at top of screen
+  </Accordion>
+  <Accordion title="shouldShowList">
+    Add to notification center
+  </Accordion>
+</AccordionGroup>
+
+## Push Token Registration
+
+### Generating Tokens
+
+```typescript
+async function registerForPushNotificationsAsync() {
+  let token;
+
+  // Configure Android notification channel
+  if (Platform.OS === 'android') {
+    await Notifications.setNotificationChannelAsync('default', {
+      name: 'default',
+      importance: Notifications.AndroidImportance.MAX,
+      vibrationPattern: [0, 250, 250, 250],
+      lightColor: '#FF231F7C',
+    });
+  }
+
+  // Check device compatibility
+  if (Device.isDevice) {
+    const { status: existingStatus } = await Notifications.getPermissionsAsync();
+    let finalStatus = existingStatus;
+
+    if (existingStatus !== 'granted') {
+      const { status } = await Notifications.requestPermissionsAsync();
+      finalStatus = status;
+    }
+
+    if (finalStatus !== 'granted') {
+      alert('¡Se necesitan permisos para recibir notificaciones!');
+      return;
+    }
+
+    // Get project ID from config
+    const projectId = 
+      Constants?.expoConfig?.extra?.eas?.projectId ?? 
+      Constants?.easConfig?.projectId;
+
+    try {
+      const pushTokenString = (
+        await Notifications.getExpoPushTokenAsync({ projectId })
+      ).data;
+      
+      console.log("✅ TOKEN GENERATED:", pushTokenString);
+      token = pushTokenString;
+    } catch (e: unknown) {
+      alert(`Error generating token: ${e}`);
+    }
+  } else {
+    alert('Debes usar un dispositivo físico para las notificaciones Push');
+  }
+
+  return token;
+}
+```
+
+<Warning>
+  Push notifications require a physical device. They will not work in iOS Simulator or Android Emulator.
+</Warning>
+
+### Saving Tokens to Firebase
+
+Tokens are automatically saved when users authenticate:
+
+```typescript
+export const usePushNotifications = () => {
+  const [expoPushToken, setExpoPushToken] = useState<string | undefined>('');
+
+  useEffect(() => {
+    registerForPushNotificationsAsync().then((token) => {
+      setExpoPushToken(token);
+
+      // Listen for auth state changes
+      const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
+        if (user && token) {
+          try {
+            const userRef = doc(db, 'users', user.uid);
+            await setDoc(
+              userRef, 
+              { pushToken: token }, 
+              { merge: true }
+            );
+            console.log("💾 TOKEN SAVED TO FIREBASE FOR:", user.email);
+          } catch (error) {
+            console.error("❌ Error saving token:", error);
+          }
+        }
+      });
+
+      return () => unsubscribeAuth();
+    });
+  }, []);
+
+  return { expoPushToken };
+};
+```
+
+<Tip>
+  Using `merge: true` ensures other user data isn't overwritten when saving the token.
+</Tip>
+
+## Scheduled Notifications
+
+### Reservation Reminders
+
+Users receive reminders 15 minutes before their reservation:
+
+```typescript
+const programarRecordatorio = async (fechaInicio: Date) => {
+  // Calculate trigger time (15 minutes before)
+  const triggerDate = new Date(fechaInicio.getTime() - 15 * 60 * 1000);
+  const now = new Date();
+
+  // Calculate seconds until trigger
+  const diffInSeconds = Math.floor((triggerDate.getTime() - now.getTime()) / 1000);
+
+  if (diffInSeconds <= 0) {
+    console.log("Reservation too soon, no reminder scheduled.");
+    return;
+  }
+
+  try {
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: "⏳ Tu reserva está por iniciar",
+        body: `Faltan 15 min para tu reserva en el cajón ${selectedSpot}. ¡Prepara tu código QR!`,
+        sound: true,
+        data: { url: '/mis-reservas' },
+      },
+      trigger: {
+        type: 'timeInterval',
+        seconds: diffInSeconds,
+        repeats: false,
+      } as any,
+    });
+    
+    console.log(`🔔 Notification scheduled in ${diffInSeconds} seconds.`);
+  } catch (error) {
+    console.log("Error scheduling notification:", error);
+  }
+};
+```
+
+<Info>
+  Scheduled notifications are stored locally and trigger even if the app is closed.
+</Info>
+
+### Notification Data
+
+Notifications can include navigation data:
+
+```typescript
+data: { url: '/mis-reservas' }
+```
+
+This allows deep linking when users tap the notification:
+
+```typescript
+responseListener.current = Notifications.addNotificationResponseReceivedListener(
+  (response) => {
+    const url = response.notification.request.content.data.url;
+    if (url) {
+      router.push(url);
+    }
+  }
+);
+```
+
+## Notification Listeners
+
+### Foreground Notifications
+
+Handle notifications when app is open:
+
+```typescript
+notificationListener.current = Notifications.addNotificationReceivedListener(
+  (notification) => {
+    setNotification(notification);
+    console.log("📬 Notification received:", notification);
+  }
+);
+```
+
+### Tap Responses
+
+Handle user taps on notifications:
+
+```typescript
+responseListener.current = Notifications.addNotificationResponseReceivedListener(
+  (response) => {
+    console.log("👆 User tapped notification:", response);
+    
+    // Navigate or perform action
+    const data = response.notification.request.content.data;
+    if (data.url) {
+      router.push(data.url);
+    }
+  }
+);
+```
+
+### Cleanup
+
+Always remove listeners when component unmounts:
+
+```typescript
+return () => {
+  notificationListener.current && 
+    notificationListener.current.remove();
+  responseListener.current && 
+    responseListener.current.remove();
+};
+```
+
+## Android Configuration
+
+### Notification Channels
+
+Android requires notification channels:
+
+```typescript
+if (Platform.OS === 'android') {
+  await Notifications.setNotificationChannelAsync('default', {
+    name: 'default',
+    importance: Notifications.AndroidImportance.MAX,
+    vibrationPattern: [0, 250, 250, 250],
+    lightColor: '#FF231F7C',
+  });
+}
+```
+
+<Card title="Importance Levels" icon="android">
+  | Level | Behavior |
+  |-------|----------|
+  | MIN | No sound, no popup |
+  | LOW | Sound but no popup |
+  | DEFAULT | Sound and popup |
+  | HIGH | Sound, popup, heads-up |
+  | **MAX** | Sound, popup, heads-up, interruption |
+</Card>
+
+## Notification Types
+
+The app sends various notification types:
+
+<AccordionGroup>
+  <Accordion title="Reservation Reminders" icon="clock">
+    **Trigger:** 15 minutes before reservation start  
+    **Content:** Spot number, time remaining, QR code prompt  
+    **Type:** Local scheduled notification
+  </Accordion>
+  
+  <Accordion title="Payment Confirmations" icon="credit-card">
+    **Trigger:** After successful payment  
+    **Content:** Credit amount, transaction ID  
+    **Type:** Push notification from server
+  </Accordion>
+  
+  <Accordion title="Reservation Status" icon="calendar-check">
+    **Trigger:** Reservation activated, completed, or canceled  
+    **Content:** Status change, penalty amount (if applicable)  
+    **Type:** Push notification from server
+  </Accordion>
+  
+  <Accordion title="Achievement Unlocks" icon="trophy">
+    **Trigger:** Achievement criteria met  
+    **Content:** Achievement name, XP earned  
+    **Type:** Local immediate notification
+  </Accordion>
+  
+  <Accordion title="Friend Requests" icon="user-plus">
+    **Trigger:** New friend request or acceptance  
+    **Content:** Friend's name and profile  
+    **Type:** Push notification from server
+  </Accordion>
+</AccordionGroup>
+
+## Server-Side Notifications
+
+Push tokens enable server-to-user notifications:
+
+```typescript
+// Server sends notification via Expo Push API
+POST https://exp.host/--/api/v2/push/send
+{
+  "to": "ExponentPushToken[xxxxxxxxxxxxxx]",
+  "sound": "default",
+  "title": "Payment Received",
+  "body": "Your wallet has been credited with 300 credits",
+  "data": { "url": "/recargarsaldo" }
+}
+```
+
+<Check>
+  The server retrieves push tokens from Firestore user documents to send targeted notifications.
+</Check>
+
+## Testing Notifications
+
+### Local Testing
+
+Test scheduled notifications:
+
+```typescript
+// Schedule test notification in 5 seconds
+await Notifications.scheduleNotificationAsync({
+  content: {
+    title: "Test Notification",
+    body: "This is a test",
+  },
+  trigger: {
+    seconds: 5,
+  },
+});
+```
+
+### Push Testing
+
+Use Expo's push notification tool:
+
+```bash
+https://expo.dev/notifications
+```
+
+Enter your push token and send test notifications.
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Permission Timing">
+    Request permissions at a meaningful moment, not immediately on app launch. Consider requesting after first successful action.
+  </Accordion>
+  
+  <Accordion title="Token Refresh">
+    Tokens can change. Always update Firebase when a new token is generated:
+    ```typescript
+    onAuthStateChanged(auth, (user) => {
+      if (user && token) {
+        updateDoc(doc(db, 'users', user.uid), { pushToken: token });
+      }
+    });
+    ```
+  </Accordion>
+  
+  <Accordion title="Notification Batching">
+    Group related notifications to avoid spam:
+    ```typescript
+    // Instead of 3 separate notifications
+    "Reservation in 15 min"
+    "Reservation in 10 min"
+    "Reservation in 5 min"
+    
+    // Send only one
+    "Reservation in 15 min"
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Troubleshooting
+
+<Warning>
+  **No notifications received?**
+  
+  1. Verify permissions are granted
+  2. Check push token is saved to Firebase
+  3. Ensure app is on a physical device
+  4. Verify notification handler is configured
+  5. Check Android notification channel settings
+</Warning>
+
+<Card title="Debug Logging" icon="bug">
+  Enable verbose logging to diagnose issues:
+  ```typescript
+  console.log("Token:", expoPushToken);
+  console.log("Notification:", notification);
+  console.log("Response:", response);
+  ```
+</Card>

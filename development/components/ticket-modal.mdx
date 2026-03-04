@@ -1,0 +1,322 @@
+---
+title: 'TicketModal Component'
+description: 'Digital ticket display with QR code generation, PDF export, and reservation details'
+---
+
+## Overview
+
+The `TicketModal` component displays a reservation confirmation ticket with a scannable QR code, reservation details, and PDF export functionality. It serves as the digital proof of parking reservation.
+
+## Component Interface
+
+```typescript components/TicketModal.tsx:8-12
+interface TicketModalProps {
+  visible: boolean;
+  onClose: () => void;
+  reservation: any; // Reservation data object
+}
+```
+
+## Props
+
+<ParamField path="visible" type="boolean" required>
+  Controls modal visibility. When `true`, the modal slides up from the bottom.
+</ParamField>
+
+<ParamField path="onClose" type="() => void" required>
+  Callback function invoked when the user closes the modal by tapping the overlay, close button, or back button.
+</ParamField>
+
+<ParamField path="reservation" type="object" required>
+  The reservation object containing ticket details. If `null` or `undefined`, the component renders nothing.
+  
+  **Expected properties:**
+  - `id` (string): Unique reservation ID, encoded in QR
+  - `date` (string): Reservation date (e.g., "2026-03-04")
+  - `time` (string): Reservation time (e.g., "14:30")
+  - `spotId` (string): Parking spot number ("1"-"10")
+  - `vehiclePlate` (string): Vehicle license plate
+  - `status` (string): Reservation status ("active", "completed", etc.)
+  - `cardLast4` (string?): Last 4 digits of payment card
+  - `penaltyApplied` (number?): Penalty amount if applicable
+</ParamField>
+
+## QR Code Generation
+
+The component generates a QR code containing the reservation ID:
+
+```tsx components/TicketModal.tsx:106-109
+<View style={styles.qrContainer}>
+  <QRCode value={reservation.id} size={140} />
+  <Text style={styles.qrText}>Escanea este código en la entrada</Text>
+</View>
+```
+
+The QR value is the plain reservation ID string, which can be scanned by parking attendants using a compatible scanner or the ScannerModal component.
+
+## PDF Export Functionality
+
+The ticket can be exported as a styled PDF using Expo's Print API:
+
+```typescript components/TicketModal.tsx:23-90
+const handlePrint = async () => {
+  const item = reservation;
+  
+  const htmlContent = `
+  <!DOCTYPE html>
+  <html>
+    <head>
+      <style>
+        /* Styled PDF template with PARKINMX branding */
+      </style>
+    </head>
+    <body>
+      <div class="ticket-container">
+        <!-- QR code from external API -->
+        <img src="https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${item.id}" />
+        <!-- Ticket details -->
+      </div>
+    </body>
+  </html>
+  `;
+
+  try {
+    const { uri } = await Print.printToFileAsync({ html: htmlContent });
+    await Sharing.shareAsync(uri, { UTI: '.pdf', mimeType: 'application/pdf' });
+  } catch (error) {
+    console.error("Error PDF:", error);
+  }
+};
+```
+
+### PDF Template Features
+
+- **Branding**: Yellow header (#FFE100) with PARKINMX logo
+- **Watermark**: Large, rotated, semi-transparent "PARKINMX" text
+- **QR Code**: External API-generated QR (300x300px) from `api.qrserver.com`
+- **Typography**: Roboto font family from Google Fonts
+- **Print-optimized**: `-webkit-print-color-adjust: exact` for accurate colors
+
+## Currency Formatting
+
+Penalty amounts are formatted using the Mexican Peso (MXN) locale:
+
+```typescript components/TicketModal.tsx:18-20
+const formatCurrency = (amount: number) => {
+  return new Intl.NumberFormat('es-MX', { 
+    style: 'currency', 
+    currency: 'MXN' 
+  }).format(amount || 0);
+};
+```
+
+Output example: `$50.00 MXN`
+
+## Ticket Layout Structure
+
+### Header Section
+
+```tsx components/TicketModal.tsx:98-102
+<View style={styles.ticketHeader}>
+  <View style={styles.ticketHoleLeft} />
+  <Text style={styles.ticketTitle}>COMPROBANTE</Text>
+  <View style={styles.ticketHoleRight} />
+</View>
+```
+
+Features decorative "holes" on left and right edges to simulate a physical ticket aesthetic.
+
+### Information Grid
+
+```tsx components/TicketModal.tsx:117-125
+<View style={styles.rowBetween}>
+  <View>
+    <Text style={styles.ticketLabel}>FECHA</Text>
+    <Text style={styles.ticketValue}>{reservation.date}</Text>
+  </View>
+  <View>
+    <Text style={styles.ticketLabel}>HORA</Text>
+    <Text style={styles.ticketValue}>{reservation.time}</Text>
+  </View>
+</View>
+```
+
+Displays key information in a two-column responsive layout:
+- Date / Time
+- Spot ID / Vehicle Plate
+- Status / Penalty (if applicable)
+
+### Conditional Penalty Display
+
+```tsx components/TicketModal.tsx:136-143
+{reservation.penaltyApplied > 0 && (
+  <View style={[styles.rowBetween, { marginTop: 5 }]}>>
+    <Text style={[styles.ticketTotalLabel, { color: '#D32F2F' }]}>Multa:</Text>
+    <Text style={[styles.ticketTotalValue, { color: '#D32F2F' }]}>
+      {formatCurrency(reservation.penaltyApplied)}
+    </Text>
+  </View>
+)}
+```
+
+Penalties are shown in red (#D32F2F) only when `penaltyApplied > 0`.
+
+## Usage Example
+
+```tsx
+import TicketModal from './components/TicketModal';
+import { useState } from 'react';
+
+function ReservationConfirmation() {
+  const [showTicket, setShowTicket] = useState(false);
+  
+  const myReservation = {
+    id: 'PKM-2026-001234',
+    date: '2026-03-04',
+    time: '14:30',
+    spotId: '7',
+    vehiclePlate: 'ABC-123-XY',
+    status: 'active',
+    cardLast4: '4242',
+    penaltyApplied: 0
+  };
+
+  return (
+    <>
+      <Button title="Ver Ticket" onPress={() => setShowTicket(true)} />
+      
+      <TicketModal
+        visible={showTicket}
+        onClose={() => setShowTicket(false)}
+        reservation={myReservation}
+      />
+    </>
+  );
+}
+```
+
+## Action Buttons
+
+### PDF Export Button
+
+```tsx components/TicketModal.tsx:146-154
+<TouchableOpacity
+  style={[styles.btnBase, { backgroundColor: '#333', marginTop: 20, marginBottom: 10 }]}
+  onPress={handlePrint}
+>
+  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
+    <Ionicons name="download-outline" size={20} color="#FFF" />
+    <Text style={{ color: '#FFF', fontWeight: 'bold', textTransform: 'uppercase' }}>Guardar PDF</Text>
+  </View>
+</TouchableOpacity>
+```
+
+### Close Button
+
+```tsx components/TicketModal.tsx:156-158
+<TouchableOpacity style={styles.btnBase} onPress={onClose}>
+  <Text style={{ color: '#FFE100', fontWeight: 'bold', textTransform: 'uppercase' }}>Cerrar</Text>
+</TouchableOpacity>
+```
+
+## Modal Behavior
+
+```tsx components/TicketModal.tsx:93-96
+<Modal visible={visible} animationType="slide" transparent>
+  <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={onClose}>
+    <TouchableWithoutFeedback>
+      <View style={styles.ticketCard}>
+```
+
+- **Animation**: Slides up from bottom (`animationType="slide"`)
+- **Transparent overlay**: Semi-transparent black background (rgba(0,0,0,0.5))
+- **Dismiss on tap**: Tapping outside the ticket card closes the modal
+- **Prevent propagation**: `TouchableWithoutFeedback` prevents taps inside the card from closing
+
+## Styling System
+
+### Typography Hierarchy
+
+```typescript components/TicketModal.tsx:175-177
+ticketLabel: { fontSize: 10, color: '#888', fontWeight: 'bold', marginBottom: 2 },
+ticketValue: { fontSize: 16, fontWeight: '600', color: '#000' },
+ticketValueSmall: { fontSize: 12, color: '#333', fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace' }
+```
+
+### Dashed Divider
+
+```typescript components/TicketModal.tsx:178
+dividerDashed: { 
+  height: 1, 
+  borderWidth: 1, 
+  borderColor: '#DDD', 
+  borderStyle: 'dashed', 
+  borderRadius: 1, 
+  marginVertical: 15 
+}
+```
+
+Creates visual separation between ticket sections.
+
+## Dependencies
+
+```json
+{
+  "react": "^18.x",
+  "react-native": "^0.73.x",
+  "react-native-qrcode-svg": "^6.x",
+  "expo-print": "^12.x",
+  "expo-sharing": "^11.x",
+  "@expo/vector-icons": "^13.x"
+}
+```
+
+## Error Handling
+
+```typescript components/TicketModal.tsx:84-90
+try {
+  const { uri } = await Print.printToFileAsync({ html: htmlContent });
+  await Sharing.shareAsync(uri, { UTI: '.pdf', mimeType: 'application/pdf' });
+} catch (error) {
+  console.error("Error PDF:", error);
+}
+```
+
+PDF generation errors are logged to console. Consider adding user-facing error alerts:
+
+```typescript
+catch (error) {
+  Alert.alert('Error', 'No se pudo generar el PDF. Intenta de nuevo.');
+}
+```
+
+## Platform Differences
+
+The component handles platform-specific font rendering:
+
+```typescript components/TicketModal.tsx:177
+fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace'
+```
+
+iOS uses "Courier" for monospace text, while Android uses "monospace".
+
+## Early Return Pattern
+
+```typescript components/TicketModal.tsx:15
+if (!reservation) return null;
+```
+
+Prevents rendering if no reservation data is provided, avoiding null pointer errors.
+
+## Accessibility Improvements
+
+Recommended additions:
+
+```tsx
+<TouchableOpacity
+  accessible={true}
+  accessibilityLabel="Guardar ticket como PDF"
+  accessibilityRole="button"
+  onPress={handlePrint}
+>
+```

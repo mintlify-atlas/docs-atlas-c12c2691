@@ -1,0 +1,557 @@
+---
+title: useHistorial
+description: Hook for fetching and filtering user reservation history with pull-to-refresh and date grouping
+---
+
+## Overview
+
+The `useHistorial` hook provides comprehensive reservation history management with advanced filtering capabilities, pull-to-refresh functionality, and intelligent date grouping. It handles both modern Firestore timestamp data and legacy string-based dates, ensuring backward compatibility.
+
+## Import
+
+```typescript
+import { useHistorial } from '@/hooks/useHistorial';
+```
+
+## Usage
+
+```typescript
+const {
+  loading,
+  refreshing,
+  onRefresh,
+  groupedList,
+  myCards,
+  filters,
+  modals
+} = useHistorial();
+
+// Access grouped reservations
+groupedList.forEach(section => {
+  console.log(section.title); // "Marzo 2026"
+  console.log(section.data);  // Array of reservations
+});
+
+// Apply filters
+filters.setFilterCard(cardId);
+filters.setStartDate(new Date('2026-03-01'));
+filters.setEndDate(new Date('2026-03-31'));
+
+// Clear filters
+filters.clearFilters();
+
+// Open detail modal
+modals.openDetail(reservation);
+```
+
+## State Values
+
+### Loading State
+
+<ResponseField name="loading" type="boolean">
+  Indicates initial data load is in progress (shows full-screen loader)
+</ResponseField>
+
+<ResponseField name="refreshing" type="boolean">
+  Indicates pull-to-refresh operation is in progress
+</ResponseField>
+
+<ResponseField name="rawList" type="array">
+  Unfiltered array of all user reservations from Firestore (internal use)
+</ResponseField>
+
+<ResponseField name="groupedList" type="array">
+  Filtered and grouped reservations by month
+  ```typescript
+  Array<{
+    title: string;  // "Marzo 2026" or "Desconocido"
+    data: any[];    // Array of reservation objects
+  }>
+  ```
+</ResponseField>
+
+### Filter State
+
+<ResponseField name="myCards" type="array">
+  Array of user's payment cards for filter dropdown
+</ResponseField>
+
+<ResponseField name="filterCard" type="string | null">
+  Selected card ID for filtering reservations
+</ResponseField>
+
+<ResponseField name="startDate" type="Date | null">
+  Start date for date range filter (inclusive)
+</ResponseField>
+
+<ResponseField name="endDate" type="Date | null">
+  End date for date range filter (inclusive)
+</ResponseField>
+
+### Modal State
+
+<ResponseField name="showFilterModal" type="boolean">
+  Controls visibility of the filter options modal
+</ResponseField>
+
+<ResponseField name="showDetailModal" type="boolean">
+  Controls visibility of the reservation detail modal
+</ResponseField>
+
+<ResponseField name="selectedRes" type="object | null">
+  Currently selected reservation for detail view
+</ResponseField>
+
+## Functions
+
+### onRefresh
+
+```typescript
+onRefresh: () => void
+```
+
+Triggers a pull-to-refresh operation. Use with React Native's `RefreshControl`:
+
+```typescript
+<ScrollView
+  refreshControl={
+    <RefreshControl
+      refreshing={refreshing}
+      onRefresh={onRefresh}
+    />
+  }
+>
+  {/* Content */}
+</ScrollView>
+```
+
+**Behavior:**
+- Sets `refreshing` to true
+- Fetches fresh data from Firestore
+- Maintains current scroll position
+- Automatically sets `refreshing` to false when complete
+
+### filters.setFilterCard
+
+```typescript
+setFilterCard: (cardId: string | null) => void
+```
+
+Filters reservations by payment card. Pass `null` to clear card filter.
+
+<ParamField path="cardId" type="string | null">
+  The ID of the card to filter by, or null to show all
+</ParamField>
+
+### filters.setStartDate
+
+```typescript
+setStartDate: (date: Date | null) => void
+```
+
+Sets the start date for the date range filter (inclusive).
+
+<ParamField path="date" type="Date | null">
+  Start date, or null to remove start boundary
+</ParamField>
+
+### filters.setEndDate
+
+```typescript
+setEndDate: (date: Date | null) => void
+```
+
+Sets the end date for the date range filter (inclusive).
+
+<ParamField path="date" type="Date | null">
+  End date, or null to remove end boundary
+</ParamField>
+
+### filters.clearFilters
+
+```typescript
+clearFilters: () => void
+```
+
+Resets all filters to their default values:
+- `filterCard` → `null`
+- `startDate` → `null`
+- `endDate` → `null`
+
+### modals.setShowFilterModal
+
+```typescript
+setShowFilterModal: (visible: boolean) => void
+```
+
+Controls visibility of the filter options modal.
+
+### modals.setShowDetailModal
+
+```typescript
+setShowDetailModal: (visible: boolean) => void
+```
+
+Controls visibility of the reservation detail modal.
+
+### modals.openDetail
+
+```typescript
+openDetail: (reservation: any) => void
+```
+
+Opens the detail modal for a specific reservation:
+
+<ParamField path="reservation" type="object">
+  The reservation object to display in detail view
+</ParamField>
+
+**Effect:**
+- Sets `selectedRes` to a copy of the reservation
+- Sets `showDetailModal` to true
+
+## Data Loading
+
+### Initial Load
+
+On mount, the hook fetches:
+1. All reservations for the current user (ordered by `createdAt` descending)
+2. All payment cards for filter dropdown
+
+```typescript
+const qRes = query(
+  collection(db, 'reservations'),
+  where('clientId', '==', auth.currentUser.uid),
+  orderBy('createdAt', 'desc') 
+);
+```
+
+### Firestore Index Requirement
+
+The query requires a composite index:
+- Collection: `reservations`
+- Fields: `clientId` (Ascending), `createdAt` (Descending)
+
+**Fallback:** If index is missing, the hook falls back to a simple query without ordering:
+
+```typescript
+try {
+  // Try ordered query
+} catch (error) {
+  // Fallback to simple query
+  const qSimple = query(
+    collection(db, 'reservations'), 
+    where('clientId', '==', auth.currentUser!.uid)
+  );
+  const snap = await getDocs(qSimple);
+  setRawList(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+}
+```
+
+## Filtering Logic
+
+### Card Filter
+
+Filters by matching `cardId` field:
+
+```typescript
+if (filterCard) {
+  filtered = filtered.filter(item => item.cardId === filterCard);
+}
+```
+
+### Date Range Filter
+
+Filters using the intelligent date extraction helper:
+
+```typescript
+if (startDate || endDate) {
+  filtered = filtered.filter(item => {
+    const itemDate = getSafeDate(item);
+    const checkDate = new Date(itemDate);
+    checkDate.setHours(0, 0, 0, 0);
+
+    if (startDate) {
+      const start = new Date(startDate);
+      start.setHours(0, 0, 0, 0);
+      if (checkDate < start) return false;
+    }
+    
+    if (endDate) {
+      const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999);
+      if (checkDate > end) return false;
+    }
+    
+    return true;
+  });
+}
+```
+
+## Date Handling
+
+### getSafeDate Helper
+
+Intelligently extracts dates from various formats:
+
+```typescript
+const getSafeDate = (item: any): Date => {
+  // 1. Modern format: Firestore Timestamp
+  if (item.startTime && item.startTime.toDate) {
+    return item.startTime.toDate();
+  }
+  
+  // 2. Legacy format: "DD/MM/YYYY" string
+  if (item.date && typeof item.date === 'string') {
+    try {
+      const parts = item.date.split('/');
+      if (parts.length === 3) {
+        const [d, m, y] = parts.map(Number);
+        return new Date(y, m - 1, d);
+      }
+    } catch (e) {
+      return new Date(0);
+    }
+  }
+  
+  // 3. Fallback for invalid/missing dates
+  return new Date(0);
+};
+```
+
+**Supported formats:**
+- Firestore Timestamp objects (preferred)
+- Legacy string format: `"04/03/2026"`
+- Fallback: `new Date(0)` for invalid data
+
+## Grouping Logic
+
+Reservations are grouped by month after filtering:
+
+```typescript
+const groups: { [key: string]: any[] } = {};
+
+filtered.forEach(item => {
+  const dateObj = getSafeDate(item);
+  let key = "Desconocido";
+  
+  if (dateObj.getTime() > 0) {
+    // Format as "Diciembre 2025"
+    const monthName = dateObj.toLocaleString('es-MX', { 
+      month: 'long', 
+      year: 'numeric' 
+    });
+    key = monthName.charAt(0).toUpperCase() + monthName.slice(1);
+  }
+  
+  if (!groups[key]) groups[key] = [];
+  groups[key].push(item);
+});
+
+const sections = Object.keys(groups).map(key => ({
+  title: key,
+  data: groups[key]
+}));
+```
+
+## Client-Side Sorting
+
+Even though Firestore orders by `createdAt`, the hook re-sorts on the client as a safety measure:
+
+```typescript
+filtered.sort((a, b) => 
+  getSafeDate(b).getTime() - getSafeDate(a).getTime()
+);
+```
+
+This ensures correct ordering even with:
+- Legacy data without `createdAt`
+- Fallback queries without `orderBy`
+- Mixed timestamp and string date formats
+
+## Side Effects
+
+### Auto-Fetch on Mount
+
+```typescript
+useEffect(() => {
+  fetchData();
+}, []);
+```
+
+### Auto-Apply Filters
+
+Filters are automatically reapplied whenever data or filter values change:
+
+```typescript
+useEffect(() => {
+  applyFiltersAndGroup();
+}, [rawList, filterCard, startDate, endDate]);
+```
+
+## Example: Reservation History Screen
+
+```typescript
+function HistorialScreen() {
+  const {
+    loading,
+    refreshing,
+    onRefresh,
+    groupedList,
+    myCards,
+    filters,
+    modals
+  } = useHistorial();
+
+  if (loading) {
+    return <ActivityIndicator size="large" />;
+  }
+
+  return (
+    <View>
+      {/* Filter Button */}
+      <Button
+        title="Filtros"
+        onPress={() => modals.setShowFilterModal(true)}
+      />
+
+      {/* Grouped List */}
+      <SectionList
+        sections={groupedList}
+        keyExtractor={(item) => item.id}
+        renderSectionHeader={({ section: { title } }) => (
+          <Text style={{ fontSize: 18, fontWeight: 'bold' }}>
+            {title}
+          </Text>
+        )}
+        renderItem={({ item }) => (
+          <TouchableOpacity onPress={() => modals.openDetail(item)}>
+            <View>
+              <Text>Cajón: {item.spotId}</Text>
+              <Text>Fecha: {item.date}</Text>
+              <Text>Hora: {item.time}</Text>
+              <Text>Placa: {item.vehiclePlate}</Text>
+              <Text>Estado: {item.status}</Text>
+            </View>
+          </TouchableOpacity>
+        )}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+          />
+        }
+        ListEmptyComponent={
+          <Text>No hay reservas</Text>
+        }
+      />
+
+      {/* Filter Modal */}
+      <Modal visible={modals.showFilterModal}>
+        <View>
+          <Text>Filtrar por Tarjeta</Text>
+          <Picker
+            selectedValue={filters.filterCard}
+            onValueChange={filters.setFilterCard}
+          >
+            <Picker.Item label="Todas" value={null} />
+            {myCards.map(card => (
+              <Picker.Item
+                key={card.id}
+                label={`**** ${card.last4}`}
+                value={card.id}
+              />
+            ))}
+          </Picker>
+
+          <Text>Fecha Inicio</Text>
+          <DateTimePicker
+            value={filters.startDate || new Date()}
+            onChange={(event, date) => filters.setStartDate(date)}
+          />
+
+          <Text>Fecha Fin</Text>
+          <DateTimePicker
+            value={filters.endDate || new Date()}
+            onChange={(event, date) => filters.setEndDate(date)}
+          />
+
+          <Button
+            title="Limpiar Filtros"
+            onPress={filters.clearFilters}
+          />
+          <Button
+            title="Cerrar"
+            onPress={() => modals.setShowFilterModal(false)}
+          />
+        </View>
+      </Modal>
+
+      {/* Detail Modal */}
+      <Modal visible={modals.showDetailModal}>
+        {modals.selectedRes && (
+          <View>
+            <Text>Detalles de Reserva</Text>
+            <Text>ID: {modals.selectedRes.customId}</Text>
+            <Text>Cajón: {modals.selectedRes.spotId}</Text>
+            <Text>Fecha: {modals.selectedRes.date}</Text>
+            <Text>Hora: {modals.selectedRes.time}</Text>
+            <Text>Vehículo: {modals.selectedRes.vehiclePlate}</Text>
+            <Text>Tarjeta: **** {modals.selectedRes.cardLast4}</Text>
+            <Text>Estado: {modals.selectedRes.status}</Text>
+            <Button
+              title="Cerrar"
+              onPress={() => modals.setShowDetailModal(false)}
+            />
+          </View>
+        )}
+      </Modal>
+    </View>
+  );
+}
+```
+
+## Reservation Status Values
+
+Typical status values you'll encounter:
+
+- `pending`: Reservation created, not yet started
+- `active`: Currently active reservation
+- `completed`: Reservation finished successfully
+- `cancelled`: Cancelled by user or system
+- `expired`: Reservation time passed without activation
+
+## Performance Considerations
+
+### Loading States
+
+The hook distinguishes between:
+- **Initial load** (`loading`): Shows full-screen spinner
+- **Pull-to-refresh** (`refreshing`): Shows native refresh indicator
+
+This prevents jarring UI transitions during refresh operations.
+
+### Filter Reactivity
+
+Filters are reactive and automatically update `groupedList` when changed. This happens in-memory without additional Firestore queries, ensuring fast filtering.
+
+### Data Caching
+
+The `rawList` acts as a local cache:
+1. Data fetched once on mount
+2. Filters applied to cached data
+3. Only refetched on explicit refresh
+
+This reduces Firestore reads and improves performance.
+
+## Firebase Dependencies
+
+- **Firestore Collections**: `reservations`, `cards`
+- **Authentication**: Requires authenticated user (`auth.currentUser`)
+- **Composite Index**: `clientId` + `createdAt` (optional but recommended)
+
+## Related Hooks
+
+- [useReservar](/development/hooks/use-reservar) - Create new reservations
+- [useTarjetas](/development/hooks/use-tarjetas) - Manage payment cards used in reservations
+- [useLogin](/development/hooks/use-login) - Authentication required to view history

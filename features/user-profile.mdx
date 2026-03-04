@@ -1,0 +1,340 @@
+---
+title: 'User Profile Management'
+description: 'Manage personal information, track achievements, and view statistics'
+icon: 'user'
+---
+
+## Overview
+
+The user profile system provides comprehensive account management, gamification features, and detailed usage statistics. Users can upload profile photos, track their level progression, unlock achievements, and view their parking history.
+
+## Profile Information
+
+### Basic Details
+
+Users can view and edit their core profile information:
+
+<CardGroup cols={2}>
+  <Card title="Display Name" icon="id-badge">
+    Extracted from Firebase authentication or email
+  </Card>
+  <Card title="Member Since" icon="calendar">
+    Account creation date from Firebase metadata
+  </Card>
+  <Card title="Profile Photo" icon="image">
+    Uploaded to Firebase Storage with CDN delivery
+  </Card>
+  <Card title="User Level" icon="medal">
+    Calculated from XP and activity
+  </Card>
+</CardGroup>
+
+## Photo Upload
+
+Users can update their profile photo with automatic cloud storage:
+
+```typescript
+const pickImage = async () => {
+  let result = await ImagePicker.launchImageLibraryAsync({
+    mediaTypes: ImagePicker.MediaTypeOptions.Images,
+    allowsEditing: true,
+    aspect: [1, 1],
+    quality: 0.5,
+  });
+  
+  if (!result.canceled) {
+    const localUri = result.assets[0].uri;
+    setUploading(true);
+    try {
+      await uploadImageAsync(localUri);
+      Alert.alert("¡Éxito!", "Tu foto de perfil se ha actualizado.");
+    } catch (e) {
+      Alert.alert("Error", "No se pudo subir la imagen.");
+    } finally {
+      setUploading(false);
+    }
+  }
+};
+```
+
+### Firebase Storage Integration
+
+```typescript
+const uploadImageAsync = async (uri: string) => {
+  const blob = await fetch(uri).then(r => r.blob());
+  
+  const user = auth.currentUser;
+  if (!user) return;
+  
+  const storage = getStorage();
+  const storageRef = ref(storage, `profile_images/${user.uid}`);
+  
+  await uploadBytes(storageRef, blob);
+  const downloadUrl = await getDownloadURL(storageRef);
+  
+  // Update Firebase Auth profile
+  await updateProfile(user, { photoURL: downloadUrl });
+  
+  return downloadUrl;
+};
+```
+
+<Note>
+  Profile photos are automatically compressed to 50% quality to optimize storage and loading times.
+</Note>
+
+## Level System
+
+Users progress through 5 levels based on accumulated XP:
+
+### Level Tiers
+
+| Level | Title | Min XP | Max XP | Benefits |
+|-------|-------|--------|--------|----------|
+| 1 | Visitante | 0 | 100 | Getting started |
+| 2 | Residente | 101 | 220 | Regular user perks |
+| 3 | Dueño de la Plaza | 221 | 350 | Premium features |
+| 4 | Experto en Parking | 351 | 500 | Expert benefits |
+| 5 | Leyenda del Estacionamiento | 501+ | ∞ | Maximum level |
+
+### XP Calculation
+
+```typescript
+const calculateXP = (stats: UserStats) => {
+  const now = new Date();
+  const diffTime = Math.abs(now.getTime() - stats.memberSinceDate.getTime());
+  const monthsActive = Math.floor(diffTime / (1000 * 60 * 60 * 24 * 30));
+  
+  let xp = 0;
+  xp += stats.reservationsClean * 100;  // 100 XP per clean reservation
+  xp += stats.dailyLogins * 30;         // 30 XP per day logged in
+  xp += monthsActive * 150;              // 150 XP per month active
+  xp += stats.friendsCount * 50;         // 50 XP per friend
+  
+  return xp;
+};
+```
+
+### Progress Bar
+
+Visual progress indicator shows advancement to next level:
+
+```typescript
+const levelInfo = getLevelData(currentXP);
+const xpRange = levelInfo.maxXP - levelInfo.minXP;
+const xpProgress = currentXP - levelInfo.minXP;
+const progressPercent = Math.min(Math.max(xpProgress / xpRange, 0), 1);
+
+<View style={styles.progressBarBackground}>
+  <View 
+    style={[
+      styles.progressBarFill, 
+      { width: `${progressPercent * 100}%` }
+    ]} 
+  />
+</View>
+```
+
+## Achievements System
+
+Users can unlock achievements through various activities:
+
+<AccordionGroup>
+  <Accordion title="Primera Reserva" icon="key">
+    **Requirements:** Complete 1 reservation  
+    **Reward:** 100 XP  
+    **Color:** Red (#FF5733)
+  </Accordion>
+  
+  <Accordion title="Magnate" icon="credit-card">
+    **Requirements:** Add 4 payment methods  
+    **Reward:** 500 XP  
+    **Color:** Gold (#FFC300)
+  </Accordion>
+  
+  <Accordion title="Cliente Fiel" icon="heart">
+    **Requirements:** Complete 20+ reservations  
+    **Reward:** 300 XP  
+    **Color:** Pink (#E91E63)
+  </Accordion>
+  
+  <Accordion title="Veterano" icon="medal">
+    **Requirements:** 5 months active  
+    **Reward:** 1000 XP  
+    **Color:** Purple (#9B59B6)
+  </Accordion>
+  
+  <Accordion title="Conductor Perfecto" icon="shield-check">
+    **Requirements:** Zero penalties on all reservations  
+    **Reward:** 250 XP  
+    **Color:** Green (#2ECC71)
+  </Accordion>
+  
+  <Accordion title="Primer Amigo" icon="users">
+    **Requirements:** Add 1 friend  
+    **Reward:** 150 XP  
+    **Color:** Blue (#2196F3)
+  </Accordion>
+  
+  <Accordion title="Alma de la Fiesta" icon="globe">
+    **Requirements:** Add 10 friends  
+    **Reward:** 1000 XP  
+    **Color:** Deep Purple (#9C27B0)
+  </Accordion>
+</AccordionGroup>
+
+### Achievement Unlocking
+
+```typescript
+const triggerUnlock = async (
+  id: string, 
+  title: string, 
+  desc: string, 
+  icon: string, 
+  xp: number
+) => {
+  if (existingAchievements.includes(id) || shownSessionAchievements.has(id)) {
+    return;
+  }
+  
+  setTimeout(async () => {
+    unlockAchievement({ title, description: desc, icon, xp });
+    shownSessionAchievements.add(id);
+    
+    await updateDoc(userRef, { 
+      unlockedAchievements: arrayUnion(id) 
+    });
+  }, 1500);
+};
+```
+
+<Info>
+  Achievements are stored in Firestore and synchronized across devices to prevent duplicate unlocks.
+</Info>
+
+## User Statistics
+
+The profile displays comprehensive activity metrics:
+
+### Statistics Tracked
+
+<CardGroup cols={2}>
+  <Card title="Total Reservations" icon="calendar">
+    ```typescript
+    const qRes = query(
+      collection(db, "reservations"), 
+      where("clientId", "==", user.uid)
+    );
+    const resSnap = await getDocs(qRes);
+    setTotalReservations(resSnap.size);
+    ```
+  </Card>
+  
+  <Card title="Clean Reservations" icon="shield-check">
+    ```typescript
+    let cleanRes = 0;
+    resSnap.forEach((doc) => {
+      const d = doc.data();
+      if (d.status === 'inactive' && (d.penaltyApplied || 0) === 0) {
+        cleanRes++;
+      }
+    });
+    ```
+  </Card>
+  
+  <Card title="Payment Cards" icon="credit-card">
+    ```typescript
+    const qCards = query(
+      collection(db, "cards"), 
+      where("userId", "==", user.uid)
+    );
+    const cardsSnap = await getDocs(qCards);
+    setCardsCount(cardsSnap.size);
+    ```
+  </Card>
+  
+  <Card title="Friends Count" icon="users">
+    ```typescript
+    const qFriends1 = query(
+      collection(db, "friend_requests"),
+      where("fromId", "==", user.uid),
+      where("status", "==", "accepted")
+    );
+    const qFriends2 = query(
+      collection(db, "friend_requests"),
+      where("toId", "==", user.uid),
+      where("status", "==", "accepted")
+    );
+    const [snapF1, snapF2] = await Promise.all([
+      getDocs(qFriends1),
+      getDocs(qFriends2)
+    ]);
+    setFriendsCount(snapF1.size + snapF2.size);
+    ```
+  </Card>
+</CardGroup>
+
+## QR Code Integration
+
+Users can display their personal QR code for friend connections:
+
+```typescript
+const qrValue = `parkinmx:${userId}`;
+
+<MyQRModal 
+  visible={showMyQR} 
+  onClose={() => setShowMyQR(false)} 
+  userId={auth.currentUser?.uid || ''}
+  userName={userName}
+/>
+```
+
+<Tip>
+  The QR code contains the user's Firebase UID prefixed with "parkinmx:" for app-specific identification.
+</Tip>
+
+## Ranking Access
+
+Users can navigate to the global leaderboard:
+
+```typescript
+<TouchableOpacity onPress={() => router.push('/ranking')}>
+  <Ionicons name="trophy-outline" size={24} color="black" />
+</TouchableOpacity>
+```
+
+## Real-Time XP Sync
+
+XP is automatically synchronized to Firebase for ranking:
+
+```typescript
+let finalXP = 0;
+finalXP += cleanRes * 100;
+finalXP += dailyLogins * 30;
+finalXP += monthsActive * 150;
+finalXP += totalFriends * 50;
+
+await updateDoc(userRef, { xp: finalXP });
+```
+
+<Check>
+  This ensures the global ranking always reflects the most current user achievements.
+</Check>
+
+## Smart Avatar Component
+
+Profile photos use cached rendering for optimal performance:
+
+```typescript
+<SmartAvatar 
+  uri={image} 
+  userId={auth.currentUser?.uid} 
+  size={100} 
+/>
+```
+
+The SmartAvatar component implements:
+- Automatic caching
+- Loading states
+- Fallback avatars
+- CDN optimization

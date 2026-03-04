@@ -1,0 +1,560 @@
+---
+title: 'History & Tracking'
+description: 'View reservation history, track past bookings, and access receipts'
+icon: 'clock-rotate-left'
+---
+
+## Overview
+
+Your reservation history provides a complete record of all your parking sessions. View past bookings, check payment details, track penalties, and access digital receipts.
+
+## Accessing Your History
+
+From the main menu:
+1. Tap **"Historial"**
+2. Your reservations appear organized by month
+3. Pull down to refresh the list
+
+## History Organization
+
+### Monthly Grouping
+
+Reservations are automatically grouped by month:
+
+```typescript Source Reference
+const groups: { [key: string]: any[] } = {};
+filtered.forEach(item => {
+  const dateObj = getSafeDate(item);
+  const monthName = dateObj.toLocaleString('es-MX', { 
+    month: 'long', 
+    year: 'numeric' 
+  });
+  const key = monthName.charAt(0).toUpperCase() + monthName.slice(1);
+  if (!groups[key]) groups[key] = [];
+  groups[key].push(item);
+});
+```
+
+**Example Display:**
+- **Marzo 2026** (4 reservations)
+- **Febrero 2026** (7 reservations)
+- **Enero 2026** (3 reservations)
+
+### Chronological Sorting
+
+Reservations are sorted newest to oldest:
+
+```typescript Source Reference
+filtered.sort((a, b) => 
+  getSafeDate(b).getTime() - getSafeDate(a).getTime()
+);
+```
+
+## Reservation Card Layout
+
+Each reservation displays as a card with:
+
+### Card Components
+
+1. **Date Badge** (left side)
+   - Day number (large)
+   - Month abbreviation (small)
+   - Example: "04 MAR"
+
+2. **Reservation Details** (center)
+   - **Title**: Spot number ("Lugar 12")
+   - **Subtitle**: Time and license plate ("02:30 PM • ABC-123")
+   - **Status Chip**: Current reservation status
+
+3. **Penalty Indicator** (if applicable)
+   - Red text showing penalty amount
+   - Example: "-$45.00 MXN"
+
+4. **Chevron Icon** (right)
+   - Tap to view full details
+
+### Date Badge Formatting
+
+```typescript Source Reference
+let dayText = "--";
+let monthText = "---";
+if (item.date && typeof item.date === 'string') {
+  const parts = item.date.split('/');
+  if (parts.length === 3) {
+    dayText = parts[0];
+    const months = [
+      "ENE", "FEB", "MAR", "ABR", "MAY", "JUN", 
+      "JUL", "AGO", "SEP", "OCT", "NOV", "DIC"
+    ];
+    monthText = months[parseInt(parts[1]) - 1] || "---";
+  }
+}
+```
+
+## Reservation Statuses
+
+Each reservation has a status chip with color coding:
+
+<Accordion title="Active - Green">
+  **Status:** `active`
+  
+  **Icon:** ⏱️ Time
+  
+  **Meaning:** Parking session is currently in progress. You've checked in but haven't checked out yet.
+  
+  ```typescript
+  case 'active': 
+    statusColor = '#2E7D32'; 
+    statusText = 'Activa'; 
+    statusIcon = "time";
+  ```
+</Accordion>
+
+<Accordion title="Pending - Orange">
+  **Status:** `pending`
+  
+  **Icon:** ⌛ Hourglass
+  
+  **Meaning:** Reservation is confirmed but you haven't arrived yet. The spot is held for you.
+  
+  ```typescript
+  case 'pending': 
+    statusColor = '#FF8F00'; 
+    statusText = 'Pendiente'; 
+    statusIcon = "hourglass";
+  ```
+</Accordion>
+
+<Accordion title="Completed - Blue">
+  **Status:** `completed`
+  
+  **Icon:** ✓ Checkmark Circle
+  
+  **Meaning:** Parking session finished successfully. Final charges have been calculated and deducted.
+  
+  ```typescript
+  case 'completed': 
+    statusColor = '#1565C0'; 
+    statusText = 'Finalizada'; 
+    statusIcon = "checkmark-circle";
+  ```
+</Accordion>
+
+<Accordion title="Cancelled - Red">
+  **Status:** `cancelled`, `cancelled_user`, `cancelled_system`, or `inactive`
+  
+  **Icon:** ✕ Close Circle
+  
+  **Meaning:** Reservation was cancelled either by you, the system, or due to no-show.
+  
+  ```typescript
+  case 'cancelled':
+  case 'cancelled_user':
+  case 'cancelled_system':
+  case 'inactive': 
+    statusColor = '#D32F2F'; 
+    statusText = 'Cancelada'; 
+    statusIcon = "close-circle";
+  ```
+</Accordion>
+
+## Viewing Reservation Details
+
+<Steps>
+  <Step title="Tap Reservation Card">
+    Select any reservation from your history list
+  </Step>
+  
+  <Step title="Detail Modal Opens">
+    A full-screen modal displays all reservation information
+  </Step>
+  
+  <Step title="View Ticket & Receipt">
+    Access your QR code ticket and payment breakdown
+  </Step>
+  
+  <Step title="Close Modal">
+    Tap the X button or swipe down to return to history
+  </Step>
+</Steps>
+
+### Detail Modal Components
+
+The TicketModal shows:
+
+<CardGroup cols={2}>
+  <Card title="QR Code" icon="qrcode">
+    Your unique reservation QR code for entry/exit scanning
+  </Card>
+  
+  <Card title="Reservation Info" icon="info-circle">
+    Date, time, spot number, vehicle details
+  </Card>
+  
+  <Card title="Payment Summary" icon="receipt">
+    Credit charges, penalties, and final total
+  </Card>
+  
+  <Card title="Status History" icon="timeline">
+    Timeline of status changes (pending → active → completed)
+  </Card>
+</CardGroup>
+
+## Filtering Your History
+
+Tap the **filter icon** (☰) in the header to open advanced filters.
+
+### Filter by Payment Card
+
+<Steps>
+  <Step title="Select Card Filter">
+    In the "Por Tarjeta" section, tap a card to filter
+  </Step>
+  
+  <Step title="View Filtered Results">
+    Only reservations paid with that card are shown
+  </Step>
+  
+  <Step title="Clear Filter">
+    Tap "Todas" to show reservations from all cards
+  </Step>
+</Steps>
+
+```typescript Source Reference
+if (filterCard) {
+  filtered = filtered.filter(item => item.cardId === filterCard);
+}
+```
+
+**Card Chips Display:**
+- "Todas" - Show all cards (default)
+- Card aliases with last 4 digits: "Personal (...1234)"
+
+### Filter by Date Range
+
+<Steps>
+  <Step title="Set Start Date">
+    Tap "Desde" button and select the beginning date
+  </Step>
+  
+  <Step title="Set End Date">
+    Tap "Hasta" button and select the ending date
+  </Step>
+  
+  <Step title="View Results">
+    Only reservations within the date range appear
+  </Step>
+</Steps>
+
+```typescript Source Reference
+if (startDate || endDate) {
+  filtered = filtered.filter(item => {
+    const itemDate = getSafeDate(item);
+    const checkDate = new Date(itemDate);
+    checkDate.setHours(0, 0, 0, 0);
+
+    if (startDate) {
+      const start = new Date(startDate); 
+      start.setHours(0, 0, 0, 0);
+      if (checkDate < start) return false;
+    }
+    if (endDate) {
+      const end = new Date(endDate); 
+      end.setHours(23, 59, 59, 999);
+      if (checkDate > end) return false;
+    }
+    return true;
+  });
+}
+```
+
+### Clearing Filters
+
+Tap **"Limpiar"** button to reset all filters and show your complete history.
+
+```typescript Source Reference
+const clearFilters = () => {
+  setFilterCard(null);
+  setStartDate(null);
+  setEndDate(null);
+};
+```
+
+## Pull-to-Refresh
+
+Keep your history up-to-date:
+
+<Steps>
+  <Step title="Pull Down">
+    Swipe down from the top of the history list
+  </Step>
+  
+  <Step title="Refresh Indicator">
+    A loading spinner appears
+  </Step>
+  
+  <Step title="Data Reloaded">
+    Latest reservations are fetched from the server
+  </Step>
+</Steps>
+
+```typescript Source Reference
+const onRefresh = useCallback(() => {
+  setRefreshing(true);
+  fetchData();
+}, []);
+
+<SectionList
+  refreshControl={
+    <RefreshControl 
+      refreshing={refreshing} 
+      onRefresh={onRefresh} 
+      colors={['#000']} 
+      progressBackgroundColor="#FFE100"
+    />
+  }
+/>
+```
+
+## Understanding Penalties
+
+### When Penalties Apply
+
+Penalties are charged for:
+
+1. **No-Show**: Reserved but didn't arrive within 30 minutes
+2. **Late Exit**: Exceeded reserved time slot significantly
+3. **Unpaid Sessions**: Failed to check out properly
+
+### Penalty Display
+
+Penalties appear in red on the reservation card:
+
+```typescript Source Reference
+const hasPenalty = item.penaltyApplied > 0;
+
+{hasPenalty && (
+  <Text style={{color: '#D32F2F', fontWeight: 'bold', fontSize: 14}}>
+    -{formatCurrency(item.penaltyApplied)}
+  </Text>
+)}
+```
+
+<Warning>
+Penalties are automatically deducted from your credit balance and cannot be refunded.
+</Warning>
+
+### Currency Formatting
+
+```typescript Source Reference
+const formatCurrency = (amount: number) => {
+  return new Intl.NumberFormat('es-MX', { 
+    style: 'currency', 
+    currency: 'MXN' 
+  }).format(amount || 0);
+};
+```
+
+**Example Output:** `$45.00`
+
+## Empty History State
+
+If you haven't made any reservations yet:
+
+**Display shows:**
+- Receipt icon
+- Message: "Sin movimientos recientes"
+
+```typescript Source Reference
+ListEmptyComponent={
+  <View style={styles.emptyContainer}>
+    <Ionicons name="receipt-outline" size={60} color="#DDD" />
+    <Text style={styles.emptyText}>Sin movimientos recientes.</Text>
+  </View>
+}
+```
+
+## Data Loading
+
+### Initial Load
+
+History loads automatically when you open the screen:
+
+```typescript Source Reference
+const fetchData = async () => {
+  if (!auth.currentUser) return;
+  
+  const qRes = query(
+    collection(db, 'reservations'),
+    where('clientId', '==', auth.currentUser.uid),
+    orderBy('createdAt', 'desc') 
+  );
+  
+  const resSnap = await getDocs(qRes);
+  const fetchedReservations = resSnap.docs.map(d => ({ 
+    id: d.id, 
+    ...d.data() 
+  }));
+  
+  setRawList(fetchedReservations);
+};
+```
+
+### Real-Time Updates
+
+History doesn't update in real-time by default. Use pull-to-refresh to get the latest data.
+
+<Tip>
+If you just completed a parking session, pull down to refresh and see the updated status and charges.
+</Tip>
+
+## Receipt Information
+
+Each completed reservation includes a digital receipt with:
+
+<AccordionGroup>
+  <Accordion title="Reservation Details">
+    - Reservation ID
+    - Date and time
+    - Spot number
+    - Duration
+  </Accordion>
+
+  <Accordion title="Vehicle Information">
+    - Vehicle alias
+    - License plate
+    - Vehicle type
+  </Accordion>
+
+  <Accordion title="Payment Breakdown">
+    - Base parking fee (credits)
+    - Time-based charges
+    - Penalties (if any)
+    - Total credits deducted
+  </Accordion>
+
+  <Accordion title="Card Used">
+    - Payment card alias
+    - Last 4 digits
+    - Transaction timestamp
+  </Accordion>
+</AccordionGroup>
+
+## Date Handling
+
+The system safely handles different date formats:
+
+```typescript Source Reference
+const getSafeDate = (item: any): Date => {
+  // 1. Firestore Timestamp
+  if (item.startTime && item.startTime.toDate) 
+    return item.startTime.toDate();
+  
+  // 2. Legacy string format "DD/MM/YYYY"
+  if (item.date && typeof item.date === 'string') {
+    const parts = item.date.split('/');
+    if (parts.length === 3) {
+      const [d, m, y] = parts.map(Number);
+      return new Date(y, m - 1, d);
+    }
+  }
+  
+  return new Date(0); // Fallback
+};
+```
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="History Not Loading">
+    **Issue:** Blank screen or loading spinner stuck
+    
+    **Solution:**
+    - Check your internet connection
+    - Pull down to refresh
+    - Restart the app
+    - Verify you're logged in
+  </Accordion>
+
+  <Accordion title="Missing Recent Reservations">
+    **Issue:** Just completed a session but it's not in history
+    
+    **Solution:**
+    - Pull down to refresh the list
+    - Wait 1-2 minutes for database sync
+    - Check that the session was properly closed
+  </Accordion>
+
+  <Accordion title="Filters Not Working">
+    **Issue:** Filter applied but all reservations still show
+    
+    **Solution:**
+    - Tap "Ver Resultados" to close the filter modal
+    - Clear filters and reapply
+    - Make sure the date range is correct
+  </Accordion>
+
+  <Accordion title="Cannot View Reservation Details">
+    **Issue:** Tapping card doesn't open details
+    
+    **Solution:**
+    - Ensure you have internet connection
+    - Try tapping again (avoid quick double-taps)
+    - Restart the app if the issue persists
+  </Accordion>
+
+  <Accordion title="Penalty Amount Incorrect">
+    **Issue:** Penalty charge seems wrong
+    
+    **Solution:** Penalties are calculated based on:
+    - No-show policies (30+ minutes late)
+    - Overtime charges
+    - System rules
+    
+    Contact support through the [Support Chat](/guides/support-chat) with your reservation ID for review.
+  </Accordion>
+</AccordionGroup>
+
+## Best Practices
+
+<Tip>
+**Regular Review**: Check your history monthly to track spending patterns and identify opportunities to save credits.
+</Tip>
+
+<Tip>
+**Use Filters**: When looking for a specific reservation, use card and date filters to narrow down results quickly.
+</Tip>
+
+<Tip>
+**Screenshot Receipts**: Take screenshots of important receipts for your personal records or expense reporting.
+</Tip>
+
+<Tip>
+**Monitor Penalties**: If you're getting frequent penalties, adjust your arrival times or cancellation habits to avoid charges.
+</Tip>
+
+## Privacy & Data Retention
+
+<Note>
+**Data Retention Policy**: Reservation history is stored indefinitely while your account is active. If you delete your account, all history is permanently removed.
+</Note>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Make New Reservation" icon="calendar-check" href="/guides/making-reservation">
+    Book your next parking spot
+  </Card>
+  
+  <Card title="Recharge Balance" icon="wallet" href="/guides/payment-methods">
+    Add credits to prepare for future sessions
+  </Card>
+  
+  <Card title="Support Chat" icon="headset" href="/guides/support-chat">
+    Questions about charges or receipts?
+  </Card>
+  
+  <Card title="Reservation System" icon="code" href="/features/reservations">
+    Technical details about reservations
+  </Card>
+</CardGroup>

@@ -1,0 +1,440 @@
+---
+title: useLogin
+description: Hook for user authentication with support for username/email login, password recovery, and two-factor verification
+---
+
+## Overview
+
+The `useLogin` hook manages the complete authentication flow including traditional login with username or email, intelligent password recovery with email verification codes, and failed attempt tracking. It integrates with Firebase Authentication and Firestore for user management.
+
+## Import
+
+```typescript
+import { useLogin } from '@/hooks/useLogin';
+```
+
+## Usage
+
+```typescript
+const {
+  identifier,
+  setIdentifier,
+  password,
+  setPassword,
+  handleLogin,
+  loading,
+  failedAttempts,
+  handleStartRecovery,
+  recoverModalVisible,
+  setRecoverModalVisible,
+  recoverStep,
+  maskedEmail,
+  inputCode,
+  setInputCode,
+  handleVerifyRecoverCode,
+  recoverLoading
+} = useLogin();
+
+// Login with email or username
+setIdentifier("user@example.com"); // or "username"
+setPassword("myPassword123");
+await handleLogin();
+
+// Password recovery
+setIdentifier("user@example.com"); // or username
+await handleStartRecovery();
+
+// Verify recovery code
+setInputCode("1234");
+handleVerifyRecoverCode();
+```
+
+## State Values
+
+### Login State
+
+<ResponseField name="identifier" type="string">
+  User's email address or username for login
+</ResponseField>
+
+<ResponseField name="password" type="string">
+  User's password for authentication
+</ResponseField>
+
+<ResponseField name="loading" type="boolean">
+  Indicates if login operation is in progress
+</ResponseField>
+
+<ResponseField name="failedAttempts" type="number">
+  Counter tracking number of failed login attempts in current session
+</ResponseField>
+
+### Recovery State
+
+<ResponseField name="recoverModalVisible" type="boolean">
+  Controls visibility of the password recovery modal
+</ResponseField>
+
+<ResponseField name="recoverStep" type="'verify_code' | 'reset_link'">
+  Current step in the recovery flow:
+  - `verify_code`: User must enter the email verification code
+  - `reset_link`: Final step showing reset link was sent
+</ResponseField>
+
+<ResponseField name="recoverEmail" type="string">
+  The full email address found during recovery process (internal use)
+</ResponseField>
+
+<ResponseField name="maskedEmail" type="string">
+  Censored email shown to user (e.g., "us***@gmail.com")
+</ResponseField>
+
+<ResponseField name="generatedCode" type="string | null">
+  The 4-digit verification code sent via email (internal use)
+</ResponseField>
+
+<ResponseField name="inputCode" type="string">
+  User's input for the verification code
+</ResponseField>
+
+<ResponseField name="recoverLoading" type="boolean">
+  Indicates if recovery operation is in progress
+</ResponseField>
+
+## Functions
+
+### setIdentifier
+
+```typescript
+setIdentifier: (value: string) => void
+```
+
+Sets the identifier (email or username) for login.
+
+<ParamField path="value" type="string">
+  Email address or username
+</ParamField>
+
+### setPassword
+
+```typescript
+setPassword: (value: string) => void
+```
+
+Sets the password for login.
+
+<ParamField path="value" type="string">
+  User's password
+</ParamField>
+
+### handleLogin
+
+```typescript
+handleLogin: () => Promise<void>
+```
+
+Handles the login process with intelligent identifier detection:
+
+**Process:**
+1. Validates that both identifier and password are provided
+2. Detects if identifier is email (contains "@") or username
+3. If username, queries Firestore to find associated email:
+   ```typescript
+   const usersRef = collection(db, "users");
+   const q = query(usersRef, where("username", "==", identifier.trim()));
+   const querySnapshot = await getDocs(q);
+   ```
+4. Authenticates using Firebase Auth with email and password
+5. On success:
+   - Resets failed attempts counter to 0
+   - Navigates to `/inicio` route
+6. On failure:
+   - Increments failed attempts counter
+   - Shows appropriate error message based on error code
+
+**Error codes handled:**
+- `auth/invalid-credential`: "Credenciales incorrectas."
+- `auth/wrong-password`: "Contraseña incorrecta."
+- Default: "Error al iniciar sesión."
+
+### handleStartRecovery
+
+```typescript
+handleStartRecovery: () => Promise<void>
+```
+
+Initiates the intelligent password recovery process:
+
+**Process:**
+1. Validates that identifier field is filled
+2. Determines if input is email or username
+3. Queries Firestore to verify account exists:
+   - For email: `where("email", "==", identifier)`
+   - For username: `where("username", "==", identifier)`
+4. If account found:
+   - Masks email for privacy (e.g., "ab***@domain.com")
+   - Generates random 4-digit code
+   - Sends verification code via EmailJS
+   - Opens recovery modal on `verify_code` step
+5. If not found:
+   - Shows appropriate error message
+
+**Email masking algorithm:**
+```typescript
+const [namePart, domainPart] = emailFound.split("@");
+const masked = `${namePart.substring(0, 2)}***@${domainPart}`;
+```
+
+### handleVerifyRecoverCode
+
+```typescript
+handleVerifyRecoverCode: () => void
+```
+
+Verifies the recovery code entered by the user:
+
+- If code matches: Calls `handleSendFinalResetLink`
+- If code doesn't match: Shows "Código incorrecto" alert
+
+### handleSendFinalResetLink
+
+```typescript
+handleSendFinalResetLink: () => Promise<void>
+```
+
+Sends the official Firebase password reset email:
+
+**Process:**
+1. Calls Firebase Auth's `sendPasswordResetEmail(auth, recoverEmail)`
+2. Updates modal step to `reset_link`
+3. User can then check their email for the secure reset link
+
+**Security:** Uses Firebase's built-in password reset mechanism which:
+- Generates a secure, time-limited token
+- Sends official password reset link
+- Ensures secure password update flow
+
+### setRecoverModalVisible
+
+```typescript
+setRecoverModalVisible: (visible: boolean) => void
+```
+
+Controls visibility of the password recovery modal.
+
+### setInputCode
+
+```typescript
+setInputCode: (code: string) => void
+```
+
+Sets the user's input for the verification code.
+
+## Email Integration
+
+The hook uses EmailJS to send verification codes during password recovery:
+
+```typescript
+await emailjs.send(
+  EMAILJS_SERVICE_ID, 
+  EMAILJS_TEMPLATE_ID,
+  { 
+    to_email: emailFound, 
+    to_name: usernameFound, 
+    message: code 
+  },
+  { publicKey: EMAILJS_PUBLIC_KEY }
+);
+```
+
+**EmailJS Configuration:**
+- Service ID: `service_ov1txor`
+- Template ID: `template_tn3fdwk`
+- Public Key: `uwyrohVqlzvgOj1KT`
+
+## Example: Login Form
+
+```typescript
+function LoginScreen() {
+  const {
+    identifier,
+    setIdentifier,
+    password,
+    setPassword,
+    handleLogin,
+    loading,
+    failedAttempts,
+    handleStartRecovery
+  } = useLogin();
+
+  return (
+    <View>
+      <TextInput
+        placeholder="Usuario o Correo"
+        value={identifier}
+        onChangeText={setIdentifier}
+        autoCapitalize="none"
+      />
+      
+      <TextInput
+        placeholder="Contraseña"
+        value={password}
+        onChangeText={setPassword}
+        secureTextEntry
+      />
+
+      {failedAttempts > 0 && (
+        <Text style={{ color: 'red' }}>
+          Intentos fallidos: {failedAttempts}
+        </Text>
+      )}
+
+      <Button
+        title="Iniciar Sesión"
+        onPress={handleLogin}
+        disabled={loading}
+      />
+
+      <TouchableOpacity onPress={handleStartRecovery}>
+        <Text>¿Olvidaste tu contraseña?</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+```
+
+## Example: Password Recovery Flow
+
+```typescript
+function PasswordRecoveryModal() {
+  const {
+    identifier,
+    setIdentifier,
+    recoverModalVisible,
+    setRecoverModalVisible,
+    recoverStep,
+    maskedEmail,
+    inputCode,
+    setInputCode,
+    handleStartRecovery,
+    handleVerifyRecoverCode,
+    recoverLoading
+  } = useLogin();
+
+  return (
+    <Modal visible={recoverModalVisible}>
+      {recoverStep === 'verify_code' && (
+        <View>
+          <Text>Código enviado a {maskedEmail}</Text>
+          <TextInput
+            placeholder="Código de 4 dígitos"
+            value={inputCode}
+            onChangeText={setInputCode}
+            keyboardType="numeric"
+            maxLength={4}
+          />
+          <Button
+            title="Verificar"
+            onPress={handleVerifyRecoverCode}
+            disabled={recoverLoading}
+          />
+        </View>
+      )}
+
+      {recoverStep === 'reset_link' && (
+        <View>
+          <Text>✅ Enlace de recuperación enviado</Text>
+          <Text>Revisa tu correo {maskedEmail} para restablecer tu contraseña</Text>
+          <Button
+            title="Cerrar"
+            onPress={() => setRecoverModalVisible(false)}
+          />
+        </View>
+      )}
+    </Modal>
+  );
+}
+```
+
+## Security Features
+
+### Failed Attempts Tracking
+
+The hook tracks failed login attempts to help detect potential security issues:
+
+```typescript
+const [failedAttempts, setFailedAttempts] = useState(0);
+
+// Increment on any authentication failure
+setFailedAttempts(prev => prev + 1);
+
+// Reset on successful login
+setFailedAttempts(0);
+```
+
+This can be used to implement:
+- Account lockout after X attempts
+- CAPTCHA triggers
+- Security notifications
+
+### Two-Factor Email Verification
+
+Password recovery requires email verification before sending reset link:
+
+1. User enters identifier
+2. System generates 4-digit code
+3. Code sent to registered email
+4. User must enter correct code
+5. Only then is Firebase reset link sent
+
+This prevents unauthorized password resets even if someone knows a username.
+
+### Email Masking
+
+Email addresses are masked when displayed to prevent information leakage:
+
+- Shows only first 2 characters of local part
+- Keeps full domain for context
+- Example: `user@example.com` → `us***@example.com`
+
+## Error Handling
+
+The hook handles various error scenarios:
+
+### Login Errors
+
+- **Empty fields**: Alert prompting for both identifier and password
+- **Username not found**: "El nombre de usuario no existe."
+- **Invalid credentials**: "Credenciales incorrectas."
+- **Wrong password**: "Contraseña incorrecta."
+- **Generic errors**: "Error al iniciar sesión."
+
+### Recovery Errors
+
+- **Empty identifier**: "Escribe tu Usuario o Correo en el campo de arriba para buscar tu cuenta."
+- **Email not found**: "Ese correo electrónico no está registrado en ParkInMX."
+- **Username not found**: "Ese nombre de usuario no existe."
+- **Email send failure**: "No se pudo generar el enlace de cambio."
+- **Generic errors**: "Ocurrió un problema al buscar tu cuenta."
+
+## Firebase Dependencies
+
+- **Authentication**: `signInWithEmailAndPassword`, `sendPasswordResetEmail`
+- **Firestore Collections**: `users`
+- **User document fields**: `username`, `email`
+
+## Navigation
+
+On successful login, the hook navigates to the home screen:
+
+```typescript
+router.replace("/inicio");
+```
+
+Uses `replace` to prevent users from going back to login screen after authentication.
+
+## Related Hooks
+
+- [useReservar](/development/hooks/use-reservar) - Requires authentication to create reservations
+- [useHistorial](/development/hooks/use-historial) - View user's reservation history
+- [useTarjetas](/development/hooks/use-tarjetas) - Manage payment methods

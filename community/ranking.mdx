@@ -1,0 +1,530 @@
+---
+title: Ranking & Leaderboard
+description: Track top performers, compete for the leaderboard, and earn achievements through XP and levels
+icon: 'ranking-star'
+---
+
+## Overview
+
+The Ranking system (`app/ranking.tsx`) displays the top 20 ParkIn users based on their XP (experience points). It creates healthy competition and motivates users to engage more with the platform.
+
+## Leaderboard Display
+
+### Top 20 Users
+
+The leaderboard queries Firebase to show the highest XP earners:
+
+```typescript
+const fetchRanking = async () => {
+  const q = query(
+    collection(db, "users"), 
+    where("role", "==", "client"), 
+    orderBy("xp", "desc"), 
+    limit(20)
+  );
+  const snap = await getDocs(q);
+  setLeaders(snap.docs.map((d, index) => ({ 
+    id: d.id, 
+    rank: index + 1, 
+    ...d.data() 
+  })));
+};
+```
+
+<Note>
+  This query requires a Firebase composite index on `role` and `xp` (descending). The console will provide the index creation link if missing.
+</Note>
+
+### Ranking Card Layout
+
+Each leaderboard entry shows:
+
+<CardGroup cols={4}>
+  <Card title="Rank Number" icon="hashtag">
+    Position #1-20 (top 3 highlighted)
+  </Card>
+  <Card title="Avatar" icon="circle-user">
+    User's profile picture via SmartAvatar
+  </Card>
+  <Card title="User Info" icon="id-card">
+    Display name and total XP
+  </Card>
+  <Card title="Trophy Icon" icon="trophy">
+    Gold/Silver/Bronze for top 3
+  </Card>
+</CardGroup>
+
+## Trophy System
+
+### Top 3 Recognition
+
+The top three positions receive special treatment:
+
+```typescript
+const renderItem = ({ item }: any) => (
+  <View style={styles.card}>
+    <Text style={[styles.rank, item.rank <= 3 && styles.topRank]}>
+      #{item.rank}
+    </Text>
+    <SmartAvatar uri={item.photoURL} userId={item.id} size={45} />
+    <View style={styles.info}>
+      <Text style={styles.name}>{item.nombres}</Text>
+      <Text style={styles.xp}>{item.xp || 0} XP</Text>
+    </View>
+    {item.rank === 1 && <Ionicons name="trophy" size={24} color="#FFD700" />}
+    {item.rank === 2 && <Ionicons name="trophy" size={24} color="#C0C0C0" />}
+    {item.rank === 3 && <Ionicons name="trophy" size={24} color="#CD7F32" />}
+  </View>
+);
+```
+
+<CardGroup cols={3}>
+  <Card title="1st Place" icon="trophy">
+    Gold trophy (#FFD700)
+  </Card>
+  <Card title="2nd Place" icon="trophy">
+    Silver trophy (#C0C0C0)
+  </Card>
+  <Card title="3rd Place" icon="trophy">
+    Bronze trophy (#CD7F32)
+  </Card>
+</CardGroup>
+
+## XP Calculation System
+
+### How XP is Earned
+
+Users accumulate XP through various activities. The calculation is synchronized across the profile system:
+
+```typescript
+// From app/PerfilPublicoScreen.tsx:48
+const calculateTotalXP = (currentStats: UserStats) => {
+  const now = new Date();
+  const diffTime = Math.abs(now.getTime() - currentStats.memberSinceDate.getTime());
+  const monthsActive = Math.floor(diffTime / (1000 * 60 * 60 * 24 * 30)); 
+
+  let totalXP = 0;
+  totalXP += currentStats.reservationsClean * 100;  // Clean reservations
+  totalXP += currentStats.dailyLogins * 30;         // Daily login streak
+  totalXP += currentStats.weeksCompleted * 100;     // Weekly challenges
+  totalXP += monthsActive * 150;                    // Membership duration
+  totalXP += currentStats.friendsCount * 50;        // Friends
+
+  return totalXP;
+};
+```
+
+### XP Breakdown
+
+<Steps>
+  <Step title="Clean Reservations">
+    **100 XP** per reservation completed without penalties
+  </Step>
+  <Step title="Daily Logins">
+    **30 XP** per day of consecutive logins
+  </Step>
+  <Step title="Weekly Challenges">
+    **100 XP** per week of consistent activity
+  </Step>
+  <Step title="Membership Duration">
+    **150 XP** per month as a member
+  </Step>
+  <Step title="Social Connections">
+    **50 XP** per friend added
+  </Step>
+</Steps>
+
+<Tip>
+  The most consistent way to climb the leaderboard is maintaining clean reservations (no penalties) and building your friend network
+</Tip>
+
+## Level System
+
+XP directly determines user levels and titles:
+
+### Level Tiers
+
+```typescript
+const getLevelData = (xp: number) => {
+  if (xp <= 100) return { 
+    level: 1, 
+    title: "Visitante", 
+    minXP: 0, 
+    maxXP: 100 
+  };
+  if (xp <= 220) return { 
+    level: 2, 
+    title: "Residente", 
+    minXP: 101, 
+    maxXP: 220 
+  };
+  if (xp <= 350) return { 
+    level: 3, 
+    title: "Dueño de la Plaza", 
+    minXP: 221, 
+    maxXP: 350 
+  };
+  if (xp <= 500) return { 
+    level: 4, 
+    title: "Experto en Parking", 
+    minXP: 351, 
+    maxXP: 500 
+  };
+  return { 
+    level: 5, 
+    title: "Leyenda del Estacionamiento", 
+    minXP: 501, 
+    maxXP: 10000 
+  };
+};
+```
+
+<CardGroup cols={3}>
+  <Card title="Level 1: Visitante" icon="1">
+    0-100 XP - New users
+  </Card>
+  <Card title="Level 2: Residente" icon="2">
+    101-220 XP - Regular users
+  </Card>
+  <Card title="Level 3: Dueño de la Plaza" icon="3">
+    221-350 XP - Experienced users
+  </Card>
+  <Card title="Level 4: Experto en Parking" icon="4">
+    351-500 XP - Power users
+  </Card>
+  <Card title="Level 5: Leyenda" icon="5">
+    501+ XP - Elite users
+  </Card>
+</CardGroup>
+
+### Progress Tracking
+
+Profiles display a progress bar showing advancement within current level:
+
+```typescript
+const levelInfo = getLevelData(currentXP);
+const xpRange = levelInfo.maxXP - levelInfo.minXP;
+const xpProgress = currentXP - levelInfo.minXP;
+const progressPercent = Math.min(Math.max(xpProgress / xpRange, 0), 1);
+```
+
+```tsx
+<View style={styles.levelContainer}>
+  <View style={styles.levelInfo}>
+    <Text style={styles.levelText}>Nivel {levelInfo.level}</Text>
+    <Text style={styles.levelText}>{currentXP} XP</Text>
+  </View>
+  <View style={styles.progressBarBackground}>
+    <View style={[
+      styles.progressBarFill, 
+      { width: `${progressPercent * 100}%` }
+    ]} />
+  </View>
+</View>
+```
+
+## Achievement System
+
+### Available Achievements
+
+Users can unlock 7 different achievements visible on their public profile:
+
+<CardGroup cols={2}>
+  <Card title="Primera Reserva" icon="key" color="#FF5733">
+    Complete your first reservation
+  </Card>
+  <Card title="Magnate" icon="credit-card" color="#FFC300">
+    Add 4+ payment cards
+  </Card>
+  <Card title="Cliente Fiel" icon="heart" color="#E91E63">
+    Complete 20+ total reservations
+  </Card>
+  <Card title="Veterano" icon="medal" color="#9B59B6">
+    Be a member for 5+ months
+  </Card>
+  <Card title="Conductor Perfecto" icon="shield-check" color="#2ECC71">
+    All reservations clean (zero penalties)
+  </Card>
+  <Card title="Primer Amigo" icon="users" color="#2196F3">
+    Add your first friend
+  </Card>
+  <Card title="Alma de la Fiesta" icon="globe" color="#9C27B0">
+    Have 10+ friends
+  </Card>
+</CardGroup>
+
+### Achievement Logic
+
+```typescript
+const achievementsList = [
+  { 
+    id: 1, 
+    title: "Primera Reserva", 
+    icon: "key", 
+    color: "#FF5733", 
+    unlocked: stats.reservationsTotal >= 1 
+  },
+  { 
+    id: 2, 
+    title: "Magnate", 
+    icon: "card", 
+    color: "#FFC300", 
+    unlocked: stats.cardsCount >= 4 
+  },
+  { 
+    id: 3, 
+    title: "Cliente Fiel", 
+    icon: "heart", 
+    color: "#E91E63", 
+    unlocked: stats.reservationsTotal > 20 
+  },
+  { 
+    id: 4, 
+    title: "Veterano", 
+    icon: "medal", 
+    color: "#9B59B6", 
+    unlocked: (
+      (new Date().getTime() - stats.memberSinceDate.getTime()) / 
+      (1000 * 60 * 60 * 24 * 30)
+    ) >= 5 
+  },
+  { 
+    id: 5, 
+    title: "Conductor Perfecto", 
+    icon: "shield-checkmark", 
+    color: "#2ECC71", 
+    unlocked: stats.reservationsTotal > 0 && 
+              stats.reservationsClean === stats.reservationsTotal 
+  },
+  { 
+    id: 6, 
+    title: "Primer Amigo", 
+    icon: "people", 
+    color: "#2196F3", 
+    unlocked: stats.friendsCount >= 1 
+  },
+  { 
+    id: 7, 
+    title: "Alma de la Fiesta", 
+    icon: "globe", 
+    color: "#9C27B0", 
+    unlocked: stats.friendsCount >= 10 
+  }
+];
+```
+
+### Badge Display
+
+Achievements appear as badges on public profiles:
+
+```typescript
+const Badge = ({ icon, color, title, unlocked }: any) => (
+  <View style={[styles.badgeContainer, !unlocked && { opacity: 0.5 }]}>
+    <View style={[
+      styles.badgeCircle, 
+      { 
+        backgroundColor: unlocked ? '#FFF' : '#DDD', 
+        borderColor: unlocked ? color : '#999' 
+      }
+    ]}>
+      <Ionicons name={icon} size={28} color={unlocked ? color : '#777'} />
+    </View>
+    <Text style={styles.badgeText}>{title}</Text>
+    {!unlocked && (
+      <View style={{position: 'absolute', top: 0, right: 5}}>
+        <Ionicons name="lock-closed" size={12} color="#555"/>
+      </View>
+    )}
+  </View>
+);
+```
+
+<Info>
+  Locked achievements show at 50% opacity with a lock icon, giving users clear goals to work toward
+</Info>
+
+## Statistics Display
+
+Public profiles show key stats that contribute to rankings:
+
+### Stat Cards
+
+```typescript
+const StatCard = ({ value, label, icon }: any) => (
+  <View style={styles.statCard}>
+    <View style={styles.statHeader}>
+      <Text style={styles.statValue}>{value}</Text>
+      <Ionicons name={icon} size={20} color="#FFE100" />
+    </View>
+    <Text style={styles.statLabel}>{label}</Text>
+  </View>
+);
+```
+
+### Displayed Metrics
+
+<CardGroup cols={2}>
+  <Card title="Reservas" icon="calendar">
+    Total reservations completed
+  </Card>
+  <Card title="Limpias" icon="shield-check">
+    Reservations without penalties
+  </Card>
+  <Card title="Tarjetas" icon="credit-card">
+    Payment methods registered
+  </Card>
+  <Card title="Amigos" icon="users">
+    Total friends count
+  </Card>
+</CardGroup>
+
+## Data Sources
+
+### User Statistics Collection
+
+The profile screen aggregates data from multiple Firebase collections:
+
+```typescript
+// 1. User document
+const userRef = doc(db, "users", userId);
+const userSnap = await getDoc(userRef);
+
+// 2. Payment cards
+const qCards = query(collection(db, "cards"), where("userId", "==", userId));
+const cardsSnap = await getDocs(qCards);
+
+// 3. Reservations
+const qRes = query(collection(db, "reservations"), where("clientId", "==", userId));
+const resSnap = await getDocs(qRes);
+
+// 4. Friends (both directions)
+const qFriends1 = query(
+  collection(db, "friend_requests"), 
+  where("fromId", "==", userId), 
+  where("status", "==", "accepted")
+);
+const qFriends2 = query(
+  collection(db, "friend_requests"), 
+  where("toId", "==", userId), 
+  where("status", "==", "accepted")
+);
+```
+
+### Clean Reservation Logic
+
+A reservation counts as "clean" if it's completed without penalties:
+
+```typescript
+let totalRes = 0;
+let cleanRes = 0;
+
+resSnap.forEach((doc) => {
+  const data = doc.data();
+  totalRes++; 
+  const penalty = data.penaltyApplied || 0; 
+  
+  if (data.status === 'inactive' && penalty === 0) {
+    cleanRes++;
+  }
+});
+```
+
+## UI Design
+
+### Header
+
+The ranking screen features a prominent header:
+
+```typescript
+<SafeAreaView style={styles.header}>
+  <TouchableOpacity onPress={() => router.back()}>
+    <Ionicons name="arrow-back" size={24}/>
+  </TouchableOpacity>
+  <Text style={styles.title}>Tabla de Líderes 🏆</Text>
+</SafeAreaView>
+```
+
+<Note>
+  The trophy emoji reinforces the competitive nature of the leaderboard
+</Note>
+
+### Card Styling
+
+Ranking cards use elevated white cards against a light background:
+
+```typescript
+const styles = StyleSheet.create({
+  card: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    backgroundColor: '#FFF', 
+    padding: 15, 
+    borderRadius: 15, 
+    marginBottom: 10, 
+    elevation: 3 
+  },
+  rank: { 
+    fontSize: 18, 
+    fontWeight: 'bold', 
+    width: 40, 
+    color: '#555' 
+  },
+  topRank: { 
+    color: '#D4AF37', // Gold color for top 3
+    fontSize: 22 
+  }
+});
+```
+
+## Competitive Features
+
+### Motivational Elements
+
+<AccordionGroup>
+  <Accordion title="Visible Rankings">
+    Users can see exactly where they stand among the top 20
+  </Accordion>
+  <Accordion title="Trophy Recognition">
+    Top 3 positions get special trophy icons
+  </Accordion>
+  <Accordion title="XP Transparency">
+    Every user can see the XP totals needed to reach higher ranks
+  </Accordion>
+  <Accordion title="Achievement Goals">
+    Locked badges show users what actions to take next
+  </Accordion>
+  <Accordion title="Clean Record Incentive">
+    Perfect driving record provides significant XP advantages
+  </Accordion>
+</AccordionGroup>
+
+### Social Competition
+
+The integration with the friend system creates friendly rivalry:
+
+- View friends' profiles to compare XP
+- See friends' achievement progress
+- Motivates clean driving to maintain ranking
+- Encourages social features (50 XP per friend)
+
+<Tip>
+  Users strategically aiming for top positions should focus on:
+  1. Maintaining clean reservations (100 XP each)
+  2. Building friend network (50 XP per friend)
+  3. Long-term membership (150 XP per month)
+</Tip>
+
+## Future Enhancements
+
+Potential competitive features to consider:
+
+- Weekly/monthly leaderboards
+- Category-specific rankings (most reservations, cleanest record, etc.)
+- Achievement rarity statistics
+- Push notifications when friends pass your rank
+- Seasonal competitions with prizes
+- Team/group challenges
+
+<Warning>
+  The leaderboard only shows client users (`where("role", "==", "client")`) to exclude staff accounts from rankings
+</Warning>

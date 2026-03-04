@@ -1,0 +1,786 @@
+---
+title: 'Firebase Configuration'
+description: 'Firebase setup, Firestore collections, authentication, and Cloud Functions'
+icon: 'fire'
+---
+
+## Overview
+
+PARKINMX uses Firebase as its backend-as-a-service platform, handling authentication, real-time database, cloud storage, and serverless functions.
+
+<Info>
+  **Firebase Version**: 12.6.0 (client)
+  
+  **Firebase Admin**: 13.6.0 (server)
+  
+  **Node Runtime**: 24
+</Info>
+
+## Firebase Services Used
+
+<CardGroup cols={2}>
+  <Card title="Authentication" icon="user-lock">
+    Email/password authentication with username support
+  </Card>
+  <Card title="Firestore" icon="database">
+    Real-time NoSQL database for all app data
+  </Card>
+  <Card title="Cloud Functions" icon="code">
+    Serverless backend functions (v2)
+  </Card>
+  <Card title="Cloud Storage" icon="cloud">
+    Profile photos and vehicle images
+  </Card>
+</CardGroup>
+
+## Firebase Initialization
+
+The Firebase client is initialized in the configs directory:
+
+```typescript configs/firebaseConfig.ts
+import { initializeApp } from 'firebase/app';
+import { getAuth } from 'firebase/auth';
+import { getFirestore } from 'firebase/firestore';
+import { getFunctions } from 'firebase/functions';
+import { getStorage } from 'firebase/storage';
+
+const firebaseConfig = {
+  apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
+  authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID
+};
+
+const app = initializeApp(firebaseConfig);
+
+export const auth = getAuth(app);
+export const db = getFirestore(app);
+export const functions = getFunctions(app);
+export const storage = getStorage(app);
+```
+
+<Note>
+  Store Firebase credentials in environment variables or `.env` file. Never commit credentials to version control.
+</Note>
+
+## Authentication Setup
+
+### Email/Password Authentication
+
+PARKINMX supports both email and username login:
+
+```typescript hooks/useLogin.ts
+import { signInWithEmailAndPassword } from "firebase/auth";
+import { collection, query, where, getDocs } from "firebase/firestore";
+
+const handleLogin = async (identifier: string, password: string) => {
+  let emailToLogin = identifier.trim();
+  
+  // If username (no @), look up email in Firestore
+  if (!identifier.includes("@")) {
+    const q = query(
+      collection(db, "users"),
+      where("username", "==", identifier.trim())
+    );
+    const snapshot = await getDocs(q);
+    
+    if (snapshot.empty) {
+      throw new Error("Username not found");
+    }
+    
+    emailToLogin = snapshot.docs[0].data().email;
+  }
+  
+  // Sign in with Firebase Auth
+  await signInWithEmailAndPassword(auth, emailToLogin, password);
+};
+```
+
+### User Registration
+
+```typescript hooks/useRegistro.ts
+import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
+import { doc, setDoc } from "firebase/firestore";
+
+const handleRegister = async (userData) => {
+  // 1. Create Firebase Auth user
+  const userCredential = await createUserWithEmailAndPassword(
+    auth,
+    userData.email,
+    userData.password
+  );
+  
+  // 2. Update display name
+  await updateProfile(userCredential.user, {
+    displayName: userData.username
+  });
+  
+  // 3. Create Firestore user document
+  await setDoc(doc(db, "users", userCredential.user.uid), {
+    username: userData.username,
+    email: userData.email,
+    phone: userData.phone,
+    name: userData.name,
+    credits_balance: 0,
+    xp: 0,
+    level: 1,
+    role: "client",
+    createdAt: new Date(),
+    photoURL: ""
+  });
+};
+```
+
+### Password Recovery
+
+Two-step verification with EmailJS:
+
+```typescript
+// 1. Send verification code via EmailJS
+const code = Math.floor(1000 + Math.random() * 9000).toString();
+await emailjs.send(
+  'service_ov1txor',
+  'template_tn3fdwk',
+  { to_email: userEmail, message: code },
+  { publicKey: 'uwyrohVqlzvgOj1KT' }
+);
+
+// 2. After code verification, send Firebase reset link
+await sendPasswordResetEmail(auth, userEmail);
+```
+
+## Firestore Collections
+
+### Collection Structure
+
+```
+firestore/
+├── users/                      # User profiles
+│   ├── {userId}/
+│   │   ├── fields              # User data
+│   │   └── transactions/       # Subcollection: credit history
+│   │       └── {transactionId}
+│   └── ...
+├── reservations/               # Parking reservations
+│   ├── {reservationId}/
+│   └── ...
+├── cards/                      # Payment cards
+│   ├── {cardId}/
+│   └── ...
+├── vehicles/                   # User vehicles
+│   ├── {vehicleId}/
+│   └── ...
+├── friend_requests/            # Friend system
+│   ├── {requestId}/
+│   └── ...
+├── support_chats/              # Support conversations
+│   ├── {userId}/
+│   │   ├── fields
+│   │   └── messages/           # Subcollection
+│   │       └── {messageId}
+│   └── ...
+└── processed_payments/         # Payment idempotency
+    ├── {paymentId}/
+    └── ...
+```
+
+### Users Collection
+
+**Path**: `/users/{userId}`
+
+```typescript
+interface User {
+  username: string;              // Unique username
+  email: string;                 // Email (from Auth)
+  name: string;                  // Display name
+  phone: string;                 // Phone number
+  photoURL?: string;             // Profile photo URL
+  credits_balance: number;       // Available credits
+  xp: number;                    // Experience points
+  level: number;                 // User level (1-100)
+  role: 'client' | 'admin';      // User role
+  createdAt: Timestamp;          // Registration date
+  memberSince?: string;          // Formatted date
+  biometricEnabled?: boolean;    // Biometric auth setting
+  pinCode?: string;              // Hashed PIN
+  pushToken?: string;            // Expo push notification token
+}
+```
+
+**Indexes Required**:
+- `username` (single field, ascending)
+- `email` (single field, ascending)
+- `xp` (single field, descending) - for leaderboard
+- `role` (single field, ascending)
+
+**Example Query**:
+```typescript
+// Get top 20 users by XP
+const q = query(
+  collection(db, "users"),
+  where("role", "==", "client"),
+  orderBy("xp", "desc"),
+  limit(20)
+);
+const snapshot = await getDocs(q);
+```
+
+### Transactions Subcollection
+
+**Path**: `/users/{userId}/transactions/{transactionId}`
+
+```typescript
+interface Transaction {
+  type: 'recharge' | 'reservation' | 'penalty_cancel' | 'penalty_noshow';
+  amount: number;                // Positive or negative
+  description: string;
+  date: Timestamp;
+  reservationId?: string;        // Related reservation
+}
+```
+
+### Reservations Collection
+
+**Path**: `/reservations/{reservationId}`
+
+```typescript
+interface Reservation {
+  clientId: string;              // User ID
+  spotId: string;                // Parking spot (A1-C10)
+  vehicleId: string;             // Reference to vehicles collection
+  cardId: string;                // Reference to cards collection
+  startTime: Timestamp;          // Reservation start
+  endTime: Timestamp;            // Calculated end time
+  status: 'pending' | 'active' | 'completed' | 'cancelled_user' | 'inactive';
+  cost: number;                  // Credits charged
+  createdAt: Timestamp;
+  verificationCode?: string;     // QR code data
+  cancelledAt?: Timestamp;
+  cancelReason?: string;
+  penaltyApplied?: number;       // Cancellation/no-show penalty
+}
+```
+
+**Indexes Required**:
+- `clientId` + `status` (composite)
+- `status` + `startTime` (composite) - for automated tasks
+
+**Real-time Listener Example**:
+```typescript hooks/use Inicio.ts
+useEffect(() => {
+  const q = query(
+    collection(db, "reservations"),
+    where("clientId", "==", auth.currentUser?.uid),
+    where("status", "in", ["active", "pending"])
+  );
+  
+  const unsubscribe = onSnapshot(q, (snapshot) => {
+    const reservations = snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+    setActiveReservations(reservations);
+  });
+  
+  return () => unsubscribe();
+}, []);
+```
+
+### Cards Collection
+
+**Path**: `/cards/{cardId}`
+
+```typescript
+interface Card {
+  userId: string;                // Owner
+  cardNumber: string;            // Last 4 digits only
+  cardHolder: string;
+  expiryDate: string;            // MM/YY format
+  cardType: 'visa' | 'mastercard' | 'amex';
+  isPrimary: boolean;            // Default payment method
+  addedAt: Timestamp;
+}
+```
+
+<Warning>
+  Never store full card numbers or CVV codes. Use tokenization services like Stripe or MercadoPago for actual payment processing.
+</Warning>
+
+### Vehicles Collection
+
+**Path**: `/vehicles/{vehicleId}`
+
+```typescript
+interface Vehicle {
+  userId: string;
+  brand: string;                 // e.g., "Toyota"
+  model: string;                 // e.g., "Corolla"
+  color: string;
+  plateNumber: string;           // License plate
+  year: number;
+  imageURL?: string;             // Vehicle photo
+  addedAt: Timestamp;
+}
+```
+
+### Friend Requests Collection
+
+**Path**: `/friend_requests/{requestId}`
+
+```typescript
+interface FriendRequest {
+  fromId: string;                // Sender user ID
+  toId: string;                  // Recipient user ID
+  status: 'pending' | 'accepted' | 'rejected';
+  createdAt: Timestamp;
+  respondedAt?: Timestamp;
+}
+```
+
+**Finding Friends**:
+```typescript hooks/useAmigos.ts
+// Get accepted friends (either direction)
+const q1 = query(
+  collection(db, "friend_requests"),
+  where("fromId", "==", currentUserId),
+  where("status", "==", "accepted")
+);
+const q2 = query(
+  collection(db, "friend_requests"),
+  where("toId", "==", currentUserId),
+  where("status", "==", "accepted")
+);
+```
+
+### Support Chats Collection
+
+**Path**: `/support_chats/{userId}`
+
+```typescript
+interface SupportChat {
+  userId: string;
+  isOpen: boolean;               // Chat active status
+  lastMessage: string;
+  lastMessageTime: Timestamp;
+  unreadCount: number;
+  createdAt: Timestamp;
+}
+```
+
+**Messages Subcollection**: `/support_chats/{userId}/messages/{messageId}`
+
+```typescript
+interface Message {
+  text: string;
+  sender: 'user' | 'support' | 'ai';
+  timestamp: Timestamp;
+  isRead: boolean;
+}
+```
+
+**Real-time Chat**:
+```typescript hooks/useSupportChat.ts
+const q = query(
+  collection(db, 'support_chats', userId, 'messages'),
+  orderBy('timestamp', 'asc')
+);
+
+const unsubscribe = onSnapshot(q, (snapshot) => {
+  const messages = snapshot.docs.map(doc => ({
+    id: doc.id,
+    ...doc.data()
+  }));
+  setMessages(messages);
+});
+```
+
+## Cloud Functions
+
+### Function Configuration
+
+```json firebase.json
+{
+  "functions": [{
+    "source": "functions",
+    "codebase": "default",
+    "disallowLegacyRuntimeConfig": true,
+    "predeploy": [
+      "npm --prefix \"$RESOURCE_DIR\" run lint"
+    ]
+  }]
+}
+```
+
+```json functions/package.json
+{
+  "engines": {
+    "node": "24"
+  },
+  "dependencies": {
+    "firebase-admin": "^13.6.0",
+    "firebase-functions": "^7.0.0",
+    "mercadopago": "^2.11.0"
+  }
+}
+```
+
+### Available Functions
+
+<AccordionGroup>
+  <Accordion title="crearPreferenciaMP (Callable)">
+    **Purpose**: Create MercadoPago payment preference for credit top-up
+    
+    **Trigger**: HTTP callable from client
+    
+    ```javascript functions/index.js
+    exports.crearPreferenciaMP = onCall(async (request) => {
+      const { monto, uid } = request.data;
+      
+      const preference = new Preference(client);
+      const result = await preference.create({
+        items: [{
+          id: 'saldo_parkinmx',
+          title: 'Recarga de Saldo - ParkInMX',
+          quantity: 1,
+          unit_price: monto,
+          currency_id: 'MXN'
+        }],
+        external_reference: uid,
+        notification_url: `https://webhookmercadopago-${process.env.GCLOUD_PROJECT}.cloudfunctions.net/webhookMercadoPago`
+      });
+      
+      return { success: true, url: result.init_point };
+    });
+    ```
+    
+    **Client Usage**:
+    ```typescript
+    import { httpsCallable } from 'firebase/functions';
+    
+    const crearPreferencia = httpsCallable(functions, 'crearPreferenciaMP');
+    const result = await crearPreferencia({ monto: 100, uid: user.uid });
+    window.open(result.data.url); // Open payment page
+    ```
+  </Accordion>
+  
+  <Accordion title="webhookMercadoPago (HTTP)">
+    **Purpose**: Process MercadoPago payment notifications
+    
+    **Trigger**: HTTP webhook from MercadoPago
+    
+    ```javascript
+    exports.webhookMercadoPago = onRequest(async (req, res) => {
+      const paymentId = req.query.id || req.query['data.id'];
+      const topic = req.query.topic || req.query.type;
+      
+      if (topic === 'payment' && paymentId) {
+        const payment = new Payment(client);
+        const paymentInfo = await payment.get({ id: paymentId });
+        
+        if (paymentInfo.status === 'approved') {
+          const userId = paymentInfo.external_reference;
+          const amount = parseFloat(paymentInfo.transaction_amount);
+          
+          // Calculate credits: $1 = 6 credits + bonus
+          let credits = amount * 6;
+          if (credits >= 100) credits += 20;
+          
+          // Atomic transaction to add credits
+          await db.runTransaction(async (t) => {
+            const paymentRef = db.collection('processed_payments').doc(paymentId.toString());
+            const docPago = await t.get(paymentRef);
+            
+            if (docPago.exists) return; // Idempotency check
+            
+            // Add credits to user
+            t.update(db.collection('users').doc(userId), {
+              credits_balance: admin.firestore.FieldValue.increment(credits)
+            });
+            
+            // Mark payment as processed
+            t.set(paymentRef, {
+              processedAt: admin.firestore.FieldValue.serverTimestamp(),
+              uid: userId,
+              amount,
+              credits
+            });
+          });
+        }
+      }
+      
+      res.status(200).send("OK");
+    });
+    ```
+  </Accordion>
+  
+  <Accordion title="cancelarReservaCliente (Callable)">
+    **Purpose**: Cancel reservation with late cancellation penalty
+    
+    **Logic**:
+    - Free cancellation if more than 1 hour before reservation
+    - 100 credit penalty if less than 1 hour before
+    
+    ```javascript
+    exports.cancelarReservaCliente = onCall(async (request) => {
+      const { reservaId } = request.data;
+      const uid = request.auth.uid;
+      
+      const COSTO_CANCELACION_TARDIA = 100;
+      
+      return db.runTransaction(async (t) => {
+        const reservaRef = db.collection('reservations').doc(reservaId);
+        const reserva = (await t.get(reservaRef)).data();
+        
+        // Check ownership and status
+        if (reserva.clientId !== uid) {
+          throw new HttpsError('permission-denied', 'Not your reservation');
+        }
+        if (reserva.status !== 'pending') {
+          throw new HttpsError('failed-precondition', 'Cannot cancel');
+        }
+        
+        // Calculate penalty
+        const now = Date.now();
+        const startTime = reserva.startTime.toDate().getTime();
+        const hoursUntil = (startTime - now) / (1000 * 60 * 60);
+        
+        const penalty = hoursUntil < 1 ? COSTO_CANCELACION_TARDIA : 0;
+        
+        // Update reservation
+        t.update(reservaRef, {
+          status: 'cancelled_user',
+          penaltyApplied: penalty,
+          cancelledAt: admin.firestore.Timestamp.now()
+        });
+        
+        // Deduct penalty if applicable
+        if (penalty > 0) {
+          t.update(db.collection('users').doc(uid), {
+            credits_balance: admin.firestore.FieldValue.increment(-penalty)
+          });
+          
+          // Log transaction
+          const transRef = db.collection('users').doc(uid).collection('transactions').doc();
+          t.set(transRef, {
+            type: 'penalty_cancel',
+            amount: -penalty,
+            description: 'Multa por cancelación tardía (< 1 hora)',
+            date: admin.firestore.Timestamp.now(),
+            reservationId: reservaId
+          });
+        }
+        
+        return { success: true, penalty };
+      });
+    });
+    ```
+  </Accordion>
+  
+  <Accordion title="vigilarNoShow (Scheduled)">
+    **Purpose**: Automatically cancel no-show reservations and charge penalty
+    
+    **Schedule**: Every 10 minutes
+    
+    **Logic**:
+    - Find reservations with status="pending" and startTime >15 minutes ago
+    - Change status to "inactive"
+    - Charge 100 credit penalty
+    
+    ```javascript
+    exports.vigilarNoShow = onSchedule({
+      schedule: "every 10 minutes",
+      timeZone: "America/Mexico_City"
+    }, async (event) => {
+      const MINUTOS_TOLERANCIA = 15;
+      const MULTA = 100;
+      
+      const limitTime = new Date(Date.now() - MINUTOS_TOLERANCIA * 60 * 1000);
+      const timestampLimit = admin.firestore.Timestamp.fromDate(limitTime);
+      
+      const snapshot = await db.collection('reservations')
+        .where('status', '==', 'pending')
+        .where('startTime', '<=', timestampLimit)
+        .get();
+      
+      if (snapshot.empty) return;
+      
+      const batch = db.batch();
+      
+      snapshot.forEach(doc => {
+        const reserva = doc.data();
+        const uid = reserva.clientId;
+        
+        // Cancel reservation
+        batch.update(doc.ref, {
+          status: 'inactive',
+          cancelReason: `No Show (${MINUTOS_TOLERANCIA} min tolerancia)`,
+          penaltyApplied: MULTA,
+          cancelledAt: admin.firestore.Timestamp.now()
+        });
+        
+        // Charge penalty
+        batch.update(db.collection('users').doc(uid), {
+          credits_balance: admin.firestore.FieldValue.increment(-MULTA)
+        });
+        
+        // Log transaction
+        const transRef = db.collection('users').doc(uid).collection('transactions').doc();
+        batch.set(transRef, {
+          type: 'penalty_noshow',
+          amount: -MULTA,
+          description: 'Multa automática por no llegar',
+          date: admin.firestore.Timestamp.now(),
+          reservationId: doc.id
+        });
+      });
+      
+      await batch.commit();
+      console.log(`👮 Cancelled ${snapshot.size} no-show reservations`);
+    });
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Security Rules
+
+<Tip>
+  Always implement Firestore Security Rules to protect your data:
+</Tip>
+
+```javascript firestore.rules
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Users can read their own profile, anyone can read public fields
+    match /users/{userId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth.uid == userId;
+      
+      // User's private transactions
+      match /transactions/{transactionId} {
+        allow read, write: if request.auth.uid == userId;
+      }
+    }
+    
+    // Reservations: users can only access their own
+    match /reservations/{reservationId} {
+      allow read: if request.auth != null && 
+        resource.data.clientId == request.auth.uid;
+      allow create: if request.auth != null &&
+        request.resource.data.clientId == request.auth.uid;
+      allow update, delete: if request.auth != null &&
+        resource.data.clientId == request.auth.uid;
+    }
+    
+    // Cards: users can only manage their own
+    match /cards/{cardId} {
+      allow read, write: if request.auth != null &&
+        resource.data.userId == request.auth.uid;
+    }
+    
+    // Vehicles: users can only manage their own
+    match /vehicles/{vehicleId} {
+      allow read, write: if request.auth != null &&
+        resource.data.userId == request.auth.uid;
+    }
+    
+    // Friend requests: visible to sender and recipient
+    match /friend_requests/{requestId} {
+      allow read: if request.auth != null && (
+        resource.data.fromId == request.auth.uid ||
+        resource.data.toId == request.auth.uid
+      );
+      allow create: if request.auth != null &&
+        request.resource.data.fromId == request.auth.uid;
+      allow update: if request.auth != null &&
+        resource.data.toId == request.auth.uid;
+    }
+    
+    // Support chats: users can only access their own
+    match /support_chats/{userId} {
+      allow read, write: if request.auth.uid == userId;
+      
+      match /messages/{messageId} {
+        allow read, write: if request.auth.uid == userId;
+      }
+    }
+  }
+}
+```
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Use Transactions" icon="arrow-right-arrow-left">
+    Always use Firestore transactions for operations that modify multiple documents or require consistency checks.
+  </Card>
+  <Card title="Implement Indexes" icon="magnifying-glass">
+    Create composite indexes for complex queries. Firebase will prompt you with a link when needed.
+  </Card>
+  <Card title="Cleanup Listeners" icon="broom">
+    Always return unsubscribe functions from `onSnapshot` in useEffect cleanup.
+  </Card>
+  <Card title="Handle Errors" icon="circle-exclamation">
+    Wrap Firebase calls in try-catch and show user-friendly error messages.
+  </Card>
+</CardGroup>
+
+## Environment Variables
+
+Create a `.env` file in the project root:
+
+```bash .env
+# Firebase Configuration
+EXPO_PUBLIC_FIREBASE_API_KEY=your_api_key
+EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN=your_project.firebaseapp.com
+EXPO_PUBLIC_FIREBASE_PROJECT_ID=your_project_id
+EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET=your_project.appspot.com
+EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=your_sender_id
+EXPO_PUBLIC_FIREBASE_APP_ID=your_app_id
+
+# EmailJS (for password recovery)
+EXPO_PUBLIC_EMAILJS_SERVICE_ID=service_ov1txor
+EXPO_PUBLIC_EMAILJS_TEMPLATE_ID=template_tn3fdwk
+EXPO_PUBLIC_EMAILJS_PUBLIC_KEY=uwyrohVqlzvgOj1KT
+
+# Google AI (for support chat)
+EXPO_PUBLIC_GEMINI_API_KEY=your_gemini_key
+```
+
+## Deployment
+
+<Steps>
+  <Step title="Install Firebase CLI">
+    ```bash
+    npm install -g firebase-tools
+    ```
+  </Step>
+  <Step title="Login to Firebase">
+    ```bash
+    firebase login
+    ```
+  </Step>
+  <Step title="Initialize Project">
+    ```bash
+    firebase init
+    ```
+    Select Firestore, Functions, and Storage.
+  </Step>
+  <Step title="Deploy Functions">
+    ```bash
+    firebase deploy --only functions
+    ```
+  </Step>
+  <Step title="Deploy Rules">
+    ```bash
+    firebase deploy --only firestore:rules
+    ```
+  </Step>
+</Steps>
+
+<Note>
+  Functions deployment can take 2-5 minutes. Monitor deployment status in the Firebase Console.
+</Note>

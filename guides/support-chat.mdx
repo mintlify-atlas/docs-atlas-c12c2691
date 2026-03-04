@@ -1,0 +1,608 @@
+---
+title: 'Support Chat'
+description: 'Using AI support chat, getting help, and common questions'
+icon: 'headset'
+---
+
+## Overview
+
+PARKINMX features an intelligent support system powered by **ParkBot**, an AI assistant trained on the platform's operations. Get instant help with reservations, payments, account issues, and general questions.
+
+<Note>
+**Hybrid Support**: The chat starts with AI assistance (ParkBot), but human agents can take over when needed for complex issues.
+</Note>
+
+## Accessing Support Chat
+
+From any screen in the app:
+1. Tap the main menu (☰)
+2. Select **"Soporte"**
+3. The support center opens with quick options
+
+## Support Center Interface
+
+### Pre-Chat Screen
+
+Before starting a chat, you'll see:
+
+**Components:**
+1. **Hero Section**: Chat icon and welcome message
+2. **Quick Options**: Pre-configured help topics
+3. **Start Chat Button**: Launch chat with ParkBot
+
+### Quick Option Cards
+
+<CardGroup cols={2}>
+  <Card title="Recover Account" icon="lock-open">
+    **Quick Message:** "Hola, necesito ayuda para recuperar mi contraseña."
+    
+    Starts chat with password recovery context.
+  </Card>
+  
+  <Card title="Payments & Billing" icon="credit-card">
+    **Quick Message:** "Tengo una duda sobre los Métodos de Pago."
+    
+    Opens chat focused on payment questions.
+  </Card>
+</CardGroup>
+
+```typescript Source Reference
+<TouchableOpacity 
+  style={styles.faqCard} 
+  onPress={() => initiateChat("Hola, necesito ayuda para recuperar mi contraseña.")}
+>
+  <View style={styles.iconCircle}>
+    <Ionicons name="lock-open" size={22} color="#FBC02D" />
+  </View>
+  <View style={styles.faqTextContainer}>
+    <Text style={styles.faqTitle}>Recuperar Cuenta</Text>
+    <Text style={styles.faqSub}>Olvidé mi contraseña</Text>
+  </View>
+</TouchableOpacity>
+```
+
+## Starting a Chat Session
+
+<Steps>
+  <Step title="Choose Entry Point">
+    Either tap a quick option card or the main "Iniciar Chat" button
+  </Step>
+  
+  <Step title="Chat Initializes">
+    A new chat session is created with a unique session ID
+  </Step>
+  
+  <Step title="ParkBot Responds">
+    AI assistant analyzes your message and provides an instant response
+  </Step>
+  
+  <Step title="Conversation Continues">
+    Chat remains open until you close it or the issue is resolved
+  </Step>
+</Steps>
+
+### Session Creation
+
+```typescript Source Reference
+const initiateChat = async (initialMessage: string | null = null) => {
+  const newSessionId = Date.now().toString();
+  const chatRef = doc(db, 'support_chats', user.uid);
+
+  await setDoc(chatRef, {
+    status: 'open',
+    activeSessionId: newSessionId,
+    adminUnreadCount: 1,
+    lastUpdated: serverTimestamp(),
+    lastMessage: initialMessage || 'El usuario solicitó asistencia.',
+    adminIsTyping: false
+  });
+
+  if (initialMessage) {
+    await addDoc(collection(db, 'support_chats', user.uid, 'messages'), {
+      text: initialMessage,
+      senderRole: 'client',
+      sessionId: newSessionId,
+      createdAt: serverTimestamp()
+    });
+    
+    handleAiResponse(initialMessage, newSessionId, user.uid);
+  }
+};
+```
+
+## Chat Interface
+
+### Header Information
+
+The chat header displays:
+
+```typescript Source Reference
+<View style={styles.headerCenter}>
+  <Text style={styles.headerTitle}>Soporte ParkInMX</Text>
+  {chatStatus === 'open' ? (
+    <View style={styles.statusBadge}>
+      <View style={styles.statusDot} />
+      <Text style={styles.statusText}>En línea</Text>
+    </View>
+  ) : (
+    <Text style={styles.statusTextOffline}>Asistente Virtual</Text>
+  )}
+</View>
+```
+
+**Status Indicators:**
+- 🟢 **"En línea"**: Chat is active (green badge)
+- **"Asistente Virtual"**: Chat not started yet
+
+### Message Bubbles
+
+<Accordion title="Your Messages (Yellow)">
+  **Appearance:**
+  - Yellow background (#FFE100)
+  - Black text
+  - Aligned to right side
+  - Timestamp below message
+  
+  ```typescript
+  <View style={[styles.bubble, styles.bubbleRight]}>
+    <Text style={styles.textBlack}>{item.text}</Text>
+    <Text style={styles.timeText}>{timestamp}</Text>
+  </View>
+  ```
+</Accordion>
+
+<Accordion title="ParkBot AI Messages (White with Purple Avatar)">
+  **Appearance:**
+  - White background
+  - Dark gray text
+  - Purple circular avatar with robot icon 🤖
+  - Aligned to left side
+  
+  ```typescript
+  {isAi ? (
+    <MaterialCommunityIcons name="robot" size={16} color="#FFF" />
+  ) : (
+    <Ionicons name="headset" size={14} color="#FFF" />
+  )}
+  ```
+</Accordion>
+
+<Accordion title="Human Agent Messages (White with Gray Avatar)">
+  **Appearance:**
+  - White background
+  - Dark gray text
+  - Gray circular avatar with headset icon 🎧
+  - Aligned to left side
+  - Takes over from AI when needed
+</Accordion>
+
+### Typing Indicators
+
+**AI Thinking:**
+```typescript Source Reference
+{isAiThinking && (
+  <View style={styles.typingContainer}>
+    <Animated.View style={[styles.typingDot, dotStyle(dot1)]} />
+    <Animated.View style={[styles.typingDot, dotStyle(dot2)]} />
+    <Animated.View style={[styles.typingDot, dotStyle(dot3)]} />
+  </View>
+)}
+```
+
+Three animated dots appear when:
+- ParkBot is processing your message
+- A human agent is typing
+
+## ParkBot AI Assistant
+
+### AI Capabilities
+
+ParkBot can help with:
+
+<CardGroup cols={2}>
+  <Card title="Account Issues" icon="user">
+    Password recovery, profile updates, security settings
+  </Card>
+  
+  <Card title="Reservations" icon="calendar">
+    How to book, modify, or cancel reservations
+  </Card>
+  
+  <Card title="Payment Questions" icon="credit-card">
+    Credit system, recharges, card management
+  </Card>
+  
+  <Card title="Technical Problems" icon="bug">
+    App issues, login problems, QR code scanning
+  </Card>
+  
+  <Card title="General Information" icon="info-circle">
+    Operating hours, parking rules, policies
+  </Card>
+  
+  <Card title="Billing Disputes" icon="file-invoice">
+    Charge questions, penalty explanations
+  </Card>
+</CardGroup>
+
+### AI Response System
+
+ParkBot uses Google's Gemini AI model:
+
+```typescript Source Reference
+const GEMINI_API_KEY = "AIzaSyDQagpCrH-AqLRUXp9uLr-LSpJPM-3Fnpo";
+const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${GEMINI_API_KEY}`;
+
+const handleAiResponse = async (userMsg: string, sessionId: string, uid: string) => {
+  setIsAiThinking(true);
+  
+  const fullPrompt = `${PARKIN_BOT_SYSTEM_PROMPT}\n\nPregunta del usuario: "${userMsg}"\n\nRespuesta de ParkBot:`;
+
+  const response = await fetch(API_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: fullPrompt }] }]
+    }),
+  });
+
+  const data = await response.json();
+  const aiResponseText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+  
+  // Save AI response to chat
+  await addDoc(collection(db, 'support_chats', uid, 'messages'), {
+    text: aiResponseText.trim(),
+    senderRole: 'admin',
+    isAi: true,
+    sessionId: sessionId,
+    createdAt: serverTimestamp()
+  });
+  
+  setIsAiThinking(false);
+};
+```
+
+### AI Context & Training
+
+ParkBot is trained with a system prompt (`PARKIN_BOT_SYSTEM_PROMPT`) that includes:
+- Platform features and workflows
+- Common user issues and solutions
+- Payment and credit system details
+- Parking policies and rules
+- Troubleshooting steps
+
+<Tip>
+The more specific your question, the better ParkBot can help. Include details like error messages, times, amounts, or reservation IDs.
+</Tip>
+
+## Human Agent Handoff
+
+The system intelligently switches from AI to human support when:
+
+### When Humans Take Over
+
+1. **Complex Issues**: Problems requiring account access or manual intervention
+2. **AI Limitation**: When ParkBot can't resolve the issue
+3. **User Request**: Explicitly asking to speak with a person
+4. **Escalated Cases**: Billing disputes, refund requests, technical bugs
+
+### Handoff Logic
+
+```typescript Source Reference
+const adminMessages = messages.filter(m => m.senderRole === 'admin');
+const lastAdminMessage = adminMessages[adminMessages.length - 1];
+
+// Human is in control if last admin message has no 'isAi' flag
+const isHumanInControl = lastAdminMessage && !lastAdminMessage.isAi;
+
+if (!isAdminTyping && !isHumanInControl) {
+  // AI can respond
+  handleAiResponse(msgToSend, currentSessionId, user.uid);
+} else {
+  // Human is handling, AI stays quiet
+  console.log("🤫 Shhh... ParkBot guarda silencio porque el humano está a cargo.");
+}
+```
+
+<Note>
+**Smart Silence**: Once a human agent responds, ParkBot stops auto-responding to avoid interrupting the conversation. This ensures a seamless support experience.
+</Note>
+
+## Sending Messages
+
+<Steps>
+  <Step title="Type Message">
+    Tap the input field at the bottom and type your message (up to 1000 characters)
+  </Step>
+  
+  <Step title="Review Text">
+    The input field supports multiple lines for longer messages
+  </Step>
+  
+  <Step title="Send">
+    Tap the yellow arrow button (↑) to send
+  </Step>
+  
+  <Step title="Wait for Response">
+    ParkBot or a human agent will respond within seconds to minutes
+  </Step>
+</Steps>
+
+### Input Field
+
+```typescript Source Reference
+<TextInput
+  style={styles.input}
+  placeholder="Escribe aquí..."
+  placeholderTextColor="#B0B0B0"
+  value={inputText}
+  onChangeText={setInputText}
+  multiline
+  maxLength={1000}
+/>
+```
+
+**Features:**
+- Multi-line support
+- Character limit: 1000
+- Auto-growing height
+- Send button activates only when text is entered
+
+### Send Button States
+
+<Accordion title="Inactive (Gray)">
+  When input is empty, button is gray and disabled.
+  
+  ```typescript
+  <View style={[styles.sendButton, { backgroundColor: '#F0F0F0' }]}>
+    <Ionicons name="arrow-up" size={20} color="#CCC" />
+  </View>
+  ```
+</Accordion>
+
+<Accordion title="Active (Yellow)">
+  When text is entered, button turns yellow and becomes tappable.
+  
+  ```typescript
+  <TouchableOpacity 
+    style={[styles.sendButton, { backgroundColor: '#FFE100' }]} 
+    onPress={sendMessage}
+  >
+    <Ionicons name="arrow-up" size={20} color="#000" />
+  </TouchableOpacity>
+  ```
+</Accordion>
+
+## Real-Time Chat Updates
+
+Messages and status sync in real-time using Firestore:
+
+```typescript Source Reference
+useEffect(() => {
+  if (!user || chatStatus !== 'open' || !currentSessionId) return;
+  
+  const q = query(
+    collection(db, 'support_chats', user.uid, 'messages'),
+    where('sessionId', '==', currentSessionId),
+    orderBy('createdAt', 'asc')
+  );
+  
+  const unsubscribe = onSnapshot(q, (snapshot) => {
+    const msgs = snapshot.docs.map(doc => ({ 
+      id: doc.id, 
+      ...doc.data() 
+    }));
+    setMessages(msgs);
+  });
+  
+  return () => unsubscribe();
+}, [user, chatStatus, currentSessionId]);
+```
+
+**Real-Time Features:**
+- New messages appear instantly
+- Typing indicators update live
+- Status changes reflect immediately
+- Unread counts update dynamically
+
+## Empty Chat State
+
+When you first open a chat:
+
+**Display:**
+- Lock icon 🔒
+- "Chat Seguro con IA"
+- "ParkBot está listo para ayudarte."
+
+```typescript Source Reference
+ListEmptyComponent={
+  <View style={styles.emptyChatState}>
+    <Text style={styles.emptyChatText}>🔒 Chat Seguro con IA</Text>
+    <Text style={styles.emptyChatSub}>ParkBot está listo para ayudarte.</Text>
+  </View>
+}
+```
+
+## Auto-Scroll Behavior
+
+Chat automatically scrolls to the latest message:
+
+```typescript Source Reference
+useEffect(() => {
+  if (messages.length > 0 || isAdminTyping || isAiThinking) {
+    setTimeout(() => {
+      flatListRef.current?.scrollToEnd({ animated: true });
+    }, 200);
+  }
+}, [messages, isAdminTyping, isAiThinking]);
+```
+
+Triggered when:
+- New message arrives
+- AI starts thinking
+- Agent starts typing
+
+## Common Support Scenarios
+
+<AccordionGroup>
+  <Accordion title="Password Recovery">
+    **User:** "Olvidé mi contraseña"
+    
+    **ParkBot:** Provides step-by-step instructions to reset password using the "Recuperar Contraseña" link on the login screen. Explains email verification process.
+  </Accordion>
+
+  <Accordion title="Credits Not Added After Payment">
+    **User:** "Pagué pero no llegaron mis créditos"
+    
+    **ParkBot:** Asks for payment receipt/transaction ID, explains typical processing time (5-10 minutes), and escalates to human agent if needed for manual verification.
+  </Accordion>
+
+  <Accordion title="Cannot Make Reservation">
+    **User:** "No puedo reservar, dice saldo insuficiente"
+    
+    **ParkBot:** Checks user's credit balance requirement (120 minimum), explains credit conversion rate, and provides direct link to recharge balance.
+  </Accordion>
+
+  <Accordion title="QR Code Not Scanning">
+    **User:** "Mi código QR no funciona en la entrada"
+    
+    **ParkBot:** Troubleshooting steps:
+    1. Check internet connection
+    2. Verify reservation status is "pending" or "active"
+    3. Increase screen brightness
+    4. Show reservation ID manually to staff
+    5. Escalate to human agent if unresolved
+  </Accordion>
+
+  <Accordion title="Penalty Charge Question">
+    **User:** "¿Por qué me cobraron una multa?"
+    
+    **ParkBot:** Explains penalty types (no-show, overtime), asks for reservation ID, reviews charge details, and connects to human agent for disputes.
+  </Accordion>
+</AccordionGroup>
+
+## Chat Data Structure
+
+### Chat Document
+
+```json
+{
+  "status": "open",
+  "activeSessionId": "1709553000000",
+  "adminUnreadCount": 2,
+  "clientUnreadCount": 0,
+  "lastUpdated": "2026-03-04T10:30:00Z",
+  "lastMessage": "¿Cómo puedo recargar saldo?",
+  "adminIsTyping": false,
+  "userInfo": {
+    "uid": "user-uid",
+    "name": "Juan Pérez",
+    "email": "juan@example.com",
+    "photoURL": "https://..."
+  }
+}
+```
+
+### Message Document
+
+```json
+{
+  "text": "Hola, ¿en qué puedo ayudarte?",
+  "senderRole": "admin",
+  "isAi": true,
+  "sessionId": "1709553000000",
+  "createdAt": "2026-03-04T10:30:15Z"
+}
+```
+
+## Privacy & Security
+
+<Warning>
+**Never Share Sensitive Information**: Do not share passwords, full credit card numbers, or other sensitive data in the chat. Support agents will never ask for this information.
+</Warning>
+
+<Note>
+**Data Retention**: Chat transcripts are stored for quality assurance and training purposes. They may be reviewed by PARKINMX staff but are never shared with third parties.
+</Note>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Chat Not Sending Messages">
+    **Issue:** Messages stuck or not sending
+    
+    **Solution:**
+    - Check internet connection
+    - Ensure you're logged in
+    - Restart the app
+    - Clear app cache (Settings > Apps > PARKINMX > Clear Cache)
+  </Accordion>
+
+  <Accordion title="ParkBot Not Responding">
+    **Issue:** AI doesn't reply to messages
+    
+    **Solution:**
+    - Wait 10-15 seconds (AI processing time)
+    - Check for typing indicator (three dots)
+    - Restart chat session
+    - Try asking a different question
+  </Accordion>
+
+  <Accordion title="Cannot Start New Chat">
+    **Issue:** "Iniciar Chat" button not working
+    
+    **Solution:**
+    - Verify account is active
+    - Check internet connection
+    - Restart the app
+    - Contact support via email if issue persists
+  </Accordion>
+
+  <Accordion title="Messages Out of Order">
+    **Issue:** Chat messages appearing in wrong sequence
+    
+    **Solution:**
+    - Pull down to refresh
+    - Close and reopen chat
+    - Check device time/date settings
+    - Restart the app
+  </Accordion>
+</AccordionGroup>
+
+## Best Practices
+
+<Tip>
+**Be Specific**: Include details like error messages, times, amounts, reservation IDs, and steps you've already tried.
+</Tip>
+
+<Tip>
+**One Issue at a Time**: Focus on one problem per chat session for faster resolution.
+</Tip>
+
+<Tip>
+**Screenshot Errors**: Take screenshots of error messages to share with support (describe the issue, don't attach images in chat).
+</Tip>
+
+<Tip>
+**Business Hours**: Human agents are available during business hours. Outside those times, ParkBot handles most inquiries instantly.
+</Tip>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Reservation Help" icon="calendar-check" href="/guides/making-reservation">
+    Learn how to make and manage reservations
+  </Card>
+  
+  <Card title="Payment Issues" icon="credit-card" href="/guides/payment-methods">
+    Understand credits, cards, and recharges
+  </Card>
+  
+  <Card title="Account Settings" icon="user-cog" href="/features/user-profile">
+    Manage your profile and security settings
+  </Card>
+  
+  <Card title="Development Hooks" icon="code" href="/development/hooks/use-support-chat">
+    Technical implementation details for developers
+  </Card>
+</CardGroup>

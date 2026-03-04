@@ -1,0 +1,651 @@
+---
+title: useSupportChat
+description: Hook for AI-powered support chat with real-time messaging, admin handoff, and Gemini integration
+---
+
+## Overview
+
+The `useSupportChat` hook provides an intelligent support chat system that seamlessly integrates AI (Google Gemini) with human admin support. It features automatic AI responses, admin takeover detection, typing indicators, and real-time message synchronization via Firestore. The AI respects human agents and stays silent when an admin is actively helping.
+
+## Import
+
+```typescript
+import { useSupportChat } from '@/hooks/useSupportChat';
+```
+
+## Usage
+
+```typescript
+const {
+  messages,
+  chatStatus,
+  inputText,
+  setInputText,
+  sendMessage,
+  initiateChat,
+  isAdminTyping,
+  isAiThinking
+} = useSupportChat();
+
+// Start a new chat session
+await initiateChat("Necesito ayuda con mi reserva");
+
+// Send a message
+setInputText("¿Cómo cancelo una reserva?");
+await sendMessage();
+
+// Check if admin is responding
+if (isAdminTyping) {
+  console.log("Admin está escribiendo...");
+}
+```
+
+## State Values
+
+### Chat State
+
+<ResponseField name="messages" type="array">
+  Array of chat messages in chronological order
+  ```typescript
+  Array<{
+    id: string;
+    text: string;
+    senderRole: 'client' | 'admin';
+    sessionId: string;
+    createdAt: Timestamp;
+    isAi?: boolean;  // true if sent by AI, undefined/false if human admin
+  }>
+  ```
+</ResponseField>
+
+<ResponseField name="chatStatus" type="'loading' | 'open' | 'closed'">
+  Current status of the chat:
+  - `loading`: Initial state, fetching chat data
+  - `open`: Active chat session
+  - `closed`: No active chat session
+</ResponseField>
+
+<ResponseField name="currentSessionId" type="string | null">
+  ID of the current active chat session
+</ResponseField>
+
+### Input State
+
+<ResponseField name="inputText" type="string">
+  Current text in the message input field
+</ResponseField>
+
+### Indicator State
+
+<ResponseField name="isAdminTyping" type="boolean">
+  Indicates if a human admin is currently typing a response
+</ResponseField>
+
+<ResponseField name="isAiThinking" type="boolean">
+  Indicates if the AI is currently generating a response
+</ResponseField>
+
+## Functions
+
+### initiateChat
+
+```typescript
+initiateChat: (initialMessage: string | null = null) => Promise<void>
+```
+
+Starts a new support chat session:
+
+<ParamField path="initialMessage" type="string | null" optional>
+  Optional first message to send when opening chat
+</ParamField>
+
+**Process:**
+1. Generates unique session ID using timestamp
+2. Creates or updates chat document in Firestore:
+   ```typescript
+   {
+     status: 'open',
+     activeSessionId: newSessionId,
+     adminUnreadCount: 1,
+     clientUnreadCount: 0,
+     lastUpdated: serverTimestamp(),
+     lastMessage: initialMessage || 'El usuario solicitó asistencia.',
+     adminIsTyping: false,
+     userInfo: {
+       uid: user.uid,
+       name: user.displayName || 'Usuario App',
+       email: user.email,
+       photoURL: user.photoURL || ''
+     }
+   }
+   ```
+3. If initial message provided:
+   - Saves message to subcollection
+   - Triggers AI response (no conversation history yet)
+
+**Use Cases:**
+- Open chat without message: `initiateChat()`
+- Open with greeting: `initiateChat("Hola, necesito ayuda")`
+
+### sendMessage
+
+```typescript
+sendMessage: () => Promise<void>
+```
+
+Sends a message from the client:
+
+**Validation:**
+- Requires `inputText` to be non-empty
+- Requires active user session
+- Requires active `currentSessionId`
+
+**Process:**
+1. Captures message text and clears input immediately
+2. Saves message to Firestore with `senderRole: 'client'`
+3. Updates chat document:
+   ```typescript
+   {
+     lastMessage: msgToSend,
+     lastUpdated: serverTimestamp(),
+     adminUnreadCount: 1
+   }
+   ```
+4. **Intelligent AI Response Logic:**
+   ```typescript
+   const adminMessages = messages.filter(m => m.senderRole === 'admin');
+   const lastAdminMessage = adminMessages[adminMessages.length - 1];
+   const isHumanInControl = lastAdminMessage && !lastAdminMessage.isAi;
+
+   if (!isAdminTyping && !isHumanInControl) {
+     handleAiResponse(msgToSend, currentSessionId, user.uid);
+   } else {
+     console.log("🤫 Shhh... ParkBot guarda silencio porque el humano está a cargo.");
+   }
+   ```
+
+**AI Response Conditions:**
+- ✅ AI responds if: Admin is NOT typing AND no recent human messages
+- ❌ AI stays silent if: Admin is typing OR human recently responded
+
+### handleAiResponse (internal)
+
+```typescript
+handleAiResponse: (userMsg: string, sessionId: string, uid: string) => Promise<void>
+```
+
+Generates and sends an AI response using Google Gemini:
+
+<ParamField path="userMsg" type="string">
+  The user's message to respond to
+</ParamField>
+
+<ParamField path="sessionId" type="string">
+  Current chat session ID
+</ParamField>
+
+<ParamField path="uid" type="string">
+  User's Firebase UID
+</ParamField>
+
+**Process:**
+1. Constructs prompt with system context + user question:
+   ```typescript
+   const fullPrompt = `${PARKIN_BOT_SYSTEM_PROMPT}\n\nPregunta del usuario: "${userMsg}"\n\nRespuesta de ParkBot:`;
+   ```
+2. Calls Google Gemini API:
+   ```typescript
+   const response = await fetch(API_URL, {
+     method: 'POST',
+     headers: { 'Content-Type': 'application/json' },
+     body: JSON.stringify({
+       contents: [{ parts: [{ text: fullPrompt }] }]
+     }),
+   });
+   ```
+3. Extracts AI response text from nested structure
+4. Saves message with `isAi: true` flag:
+   ```typescript
+   await addDoc(collection(db, 'support_chats', uid, 'messages'), {
+     text: aiResponseText.trim(),
+     senderRole: 'admin',
+     isAi: true,
+     sessionId: sessionId,
+     createdAt: serverTimestamp()
+   });
+   ```
+5. Updates chat document for admin dashboard
+
+**Error Handling:**
+- Logs detailed error information
+- Shows alert if API fails
+- Sets `isAiThinking` to false in finally block
+
+### setInputText
+
+```typescript
+setInputText: (text: string) => void
+```
+
+Sets the message input text.
+
+## AI System Prompt
+
+The AI uses the `PARKIN_BOT_SYSTEM_PROMPT` which defines:
+
+**Personality:**
+- Amigable y eficiente
+- Uses emojis (🚗, 🅿️, 🔧, 🎫)
+- Short, mobile-friendly responses
+- Spanish (Mexico)
+
+**Knowledge Base:**
+1. **Reservations**: How to book spots, select date/time/vehicle
+2. **Password Recovery**: Steps to reset password
+3. **Vehicles**: Registering cars, managing plates
+4. **Credits & Payments**: Credit system, card management
+5. **Cancellations**: Cancellation penalties (100 credits)
+6. **Location**: API Seybaplaya, hours 7 AM - 11 PM
+7. **Access Codes**: QR/NIP code usage
+
+**Limitations:**
+- Admits when it doesn't know something
+- Suggests human agent escalation when needed
+- Never invents information
+
+Full prompt available in `/constants/AiContext.ts`
+
+## Real-time Listeners
+
+### Chat Status Listener
+
+Monitors overall chat state and admin typing status:
+
+```typescript
+useEffect(() => {
+  if (!user) return;
+  const chatDocRef = doc(db, 'support_chats', user.uid);
+  const unsubscribe = onSnapshot(chatDocRef, (docSnap) => {
+    if (docSnap.exists()) {
+      const data = docSnap.data();
+      setChatStatus(data.status || 'closed');
+      setCurrentSessionId(data.activeSessionId || null);
+      setIsAdminTyping(data.adminIsTyping || false);
+      
+      // Auto-mark client messages as read
+      if (data.status === 'open' && data.clientUnreadCount > 0) {
+        updateDoc(chatDocRef, { clientUnreadCount: 0 });
+      }
+    } else {
+      setChatStatus('closed');
+    }
+  });
+  return () => unsubscribe();
+}, [user]);
+```
+
+### Messages Listener
+
+Monitors messages for the current session:
+
+```typescript
+useEffect(() => {
+  if (!user || chatStatus !== 'open' || !currentSessionId) {
+    if (chatStatus === 'closed') setMessages([]);
+    return;
+  }
+  
+  const q = query(
+    collection(db, 'support_chats', user.uid, 'messages'),
+    where('sessionId', '==', currentSessionId),
+    orderBy('createdAt', 'asc')
+  );
+  
+  const unsubscribe = onSnapshot(q, (snapshot) => {
+    const msgs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    setMessages(msgs);
+  });
+  
+  return () => unsubscribe();
+}, [user, chatStatus, currentSessionId]);
+```
+
+**Features:**
+- Only listens when chat is open
+- Filters by active session ID
+- Orders chronologically
+- Auto-clears messages when chat closes
+
+## AI vs Human Detection
+
+The system intelligently determines when to let AI respond:
+
+```typescript
+// Find the most recent admin message
+const adminMessages = messages.filter(m => m.senderRole === 'admin');
+const lastAdminMessage = adminMessages[adminMessages.length - 1];
+
+// Check if it's from a human
+const isHumanInControl = lastAdminMessage && !lastAdminMessage.isAi;
+
+// AI only responds if:
+// 1. Admin is NOT currently typing
+// 2. No recent human messages in conversation
+if (!isAdminTyping && !isHumanInControl) {
+  handleAiResponse(msgToSend, currentSessionId, user.uid);
+}
+```
+
+**Why this matters:**
+- Prevents AI from interrupting human agents
+- Ensures smooth handoff from AI to human
+- Human admin maintains control once they engage
+
+## Firestore Structure
+
+### Chat Document
+
+Path: `support_chats/{userId}`
+
+```typescript
+{
+  status: 'open' | 'closed',
+  activeSessionId: string,
+  adminUnreadCount: number,
+  clientUnreadCount: number,
+  lastUpdated: Timestamp,
+  lastMessage: string,
+  adminIsTyping: boolean,
+  userInfo: {
+    uid: string,
+    name: string,
+    email: string,
+    photoURL: string
+  }
+}
+```
+
+### Message Documents
+
+Path: `support_chats/{userId}/messages/{messageId}`
+
+```typescript
+{
+  text: string,
+  senderRole: 'client' | 'admin',
+  sessionId: string,
+  createdAt: Timestamp,
+  isAi?: boolean  // Present and true for AI messages
+}
+```
+
+## Example: Chat Interface
+
+```typescript
+function SupportChatScreen() {
+  const {
+    messages,
+    chatStatus,
+    inputText,
+    setInputText,
+    sendMessage,
+    initiateChat,
+    isAdminTyping,
+    isAiThinking
+  } = useSupportChat();
+
+  if (chatStatus === 'loading') {
+    return <ActivityIndicator />;
+  }
+
+  if (chatStatus === 'closed') {
+    return (
+      <View>
+        <Text>¿Necesitas ayuda?</Text>
+        <Button
+          title="Iniciar Chat"
+          onPress={() => initiateChat()}
+        />
+      </View>
+    );
+  }
+
+  return (
+    <View style={{ flex: 1 }}>
+      {/* Messages List */}
+      <FlatList
+        data={messages}
+        keyExtractor={(item) => item.id}
+        renderItem={({ item }) => (
+          <View
+            style={{
+              alignSelf: item.senderRole === 'client' ? 'flex-end' : 'flex-start',
+              backgroundColor: item.senderRole === 'client' ? '#007AFF' : '#E5E5EA',
+              padding: 10,
+              borderRadius: 15,
+              margin: 5
+            }}
+          >
+            <Text
+              style={{
+                color: item.senderRole === 'client' ? 'white' : 'black'
+              }}
+            >
+              {item.text}
+            </Text>
+            {item.senderRole === 'admin' && item.isAi && (
+              <Text style={{ fontSize: 10, color: 'gray', marginTop: 4 }}
+              >
+                🤖 ParkBot
+              </Text>
+            )}
+          </View>
+        )}
+      />
+
+      {/* Typing Indicators */}
+      {isAdminTyping && (
+        <View style={{ padding: 10 }}>
+          <Text>👤 Admin está escribiendo...</Text>
+        </View>
+      )}
+      {isAiThinking && (
+        <View style={{ padding: 10 }}>
+          <Text>🤖 ParkBot está pensando...</Text>
+        </View>
+      )}
+
+      {/* Input */}
+      <View style={{ flexDirection: 'row', padding: 10 }}>
+        <TextInput
+          style={{ flex: 1, borderWidth: 1, borderRadius: 20, padding: 10 }}
+          value={inputText}
+          onChangeText={setInputText}
+          placeholder="Escribe un mensaje..."
+          multiline
+        />
+        <TouchableOpacity
+          onPress={sendMessage}
+          disabled={!inputText.trim()}
+          style={{
+            width: 40,
+            height: 40,
+            borderRadius: 20,
+            backgroundColor: '#007AFF',
+            justifyContent: 'center',
+            alignItems: 'center',
+            marginLeft: 10
+          }}
+        >
+          <Text style={{ color: 'white', fontSize: 18 }}>↑</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+}
+```
+
+## Example: AI Badge Component
+
+```typescript
+function MessageBubble({ message }) {
+  const isClient = message.senderRole === 'client';
+  const isAi = message.isAi === true;
+
+  return (
+    <View style={{ alignSelf: isClient ? 'flex-end' : 'flex-start' }}>
+      <View
+        style={{
+          backgroundColor: isClient ? '#007AFF' : '#E5E5EA',
+          padding: 12,
+          borderRadius: 16
+        }}
+      >
+        <Text style={{ color: isClient ? 'white' : 'black' }}>
+          {message.text}
+        </Text>
+      </View>
+      
+      {/* Show badge for AI messages */}
+      {!isClient && (
+        <Text
+          style={{
+            fontSize: 10,
+            color: 'gray',
+            marginTop: 2,
+            marginLeft: 8
+          }}
+        >
+          {isAi ? '🤖 ParkBot' : '👤 Admin'}
+        </Text>
+      )}
+      
+      {/* Timestamp */}
+      <Text style={{ fontSize: 10, color: 'gray', marginTop: 2 }}>
+        {message.createdAt?.toDate().toLocaleTimeString('es-MX', {
+          hour: '2-digit',
+          minute: '2-digit'
+        })}
+      </Text>
+    </View>
+  );
+}
+```
+
+## Gemini API Configuration
+
+**Endpoint:**
+```
+https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent
+```
+
+**API Key:** `AIzaSyDQagpCrH-AqLRUXp9uLr-LSpJPM-3Fnpo`
+
+**Request Format:**
+```typescript
+{
+  contents: [
+    {
+      parts: [
+        { text: "System prompt + User question" }
+      ]
+    }
+  ]
+}
+```
+
+**Response Format:**
+```typescript
+{
+  candidates: [
+    {
+      content: {
+        parts: [
+          { text: "AI response text" }
+        ]
+      }
+    }
+  ]
+}
+```
+
+## Error Handling
+
+### API Errors
+
+- Logs detailed error response from Google
+- Shows user-friendly alert
+- Doesn't break chat functionality
+
+```typescript
+if (!response.ok) {
+  const errorMsg = data.error?.message || "Error desconocido de Google";
+  console.error("❌ ERROR DETALLADO GOOGLE:", JSON.stringify(data, null, 2));
+  Alert.alert("Error de IA", errorMsg);
+  throw new Error(errorMsg);
+}
+```
+
+### Message Send Errors
+
+- Catches and logs errors
+- User can retry sending
+- Doesn't lose message input
+
+### Listener Errors
+
+- Firestore listeners auto-reconnect on network issues
+- Missing data handled with fallback values
+- Chat gracefully degrades if Firestore unavailable
+
+## Performance Considerations
+
+### Message History
+
+Currently loads all messages for active session. For optimization:
+- Consider pagination for very long conversations
+- Archive old sessions
+- Limit query to recent N messages
+
+### Real-time Updates
+
+Uses Firestore real-time listeners which:
+- Only pay for actual changes (not polling)
+- Automatically batch updates
+- Handle offline/online transitions
+
+### AI Response Time
+
+Gemini Flash model typically responds in:
+- Simple queries: 1-2 seconds
+- Complex queries: 3-5 seconds
+
+`isAiThinking` indicator provides user feedback during generation.
+
+## Firebase Dependencies
+
+- **Firestore Collections**: `support_chats`, `support_chats/{uid}/messages`
+- **Authentication**: Requires authenticated user
+- **Composite Index**: `sessionId` + `createdAt` on messages subcollection
+
+## Security Rules Recommendation
+
+```javascript
+match /support_chats/{userId} {
+  // Users can only read/write their own chat
+  allow read, write: if request.auth.uid == userId;
+  
+  match /messages/{messageId} {
+    // Users can only read/write messages in their chat
+    allow read, write: if request.auth.uid == userId;
+  }
+}
+
+// Admins need separate rules with custom claims
+```
+
+## Related Hooks
+
+- [useLogin](/development/hooks/use-login) - Authentication required for support chat
+- [useReservar](/development/hooks/use-reservar) - Common support topic: reservation help
+- [useHistorial](/development/hooks/use-historial) - Common support topic: viewing past reservations
