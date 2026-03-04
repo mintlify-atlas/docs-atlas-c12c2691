@@ -1,0 +1,407 @@
+---
+title: useAmigos
+description: Friend management and social features hook for PARKINMX community system
+icon: "users"
+---
+
+The `useAmigos` hook manages all friend-related functionality in PARKINMX, including friend lists, friend requests, user search, and suggestions.
+
+## Overview
+
+This hook provides a complete social layer for the app, allowing users to:
+- View their friends list
+- Send and receive friend requests
+- Search for other users by username
+- Get friend suggestions
+- Accept or reject friend requests
+- Remove existing friends
+
+<Info>
+All friend operations work exclusively with users who have the `role: "client"` in Firestore to prevent admins from appearing in searches.
+</Info>
+
+## Import
+
+```typescript
+import { useAmigos } from '@/hooks/useAmigos';
+```
+
+## Usage
+
+```typescript
+const {
+  friends,
+  requests,
+  sentRequests,
+  suggestions,
+  searchResults,
+  loading,
+  fetchFriends,
+  fetchRequests,
+  searchUsers,
+  fetchSuggestions,
+  sendFriendRequest,
+  acceptRequest,
+  rejectRequest,
+  removeFriend,
+  refreshAll
+} = useAmigos();
+```
+
+## State Values
+
+<ParamField path="friends" type="any[]">
+  Array of accepted friends with user data (id, username, nombres, apellidos, photoURL, etc.)
+</ParamField>
+
+<ParamField path="requests" type="any[]">
+  Incoming friend requests with requestId and sender data
+</ParamField>
+
+<ParamField path="sentRequests" type="string[]">
+  Array of user IDs to whom current user has sent pending requests
+</ParamField>
+
+<ParamField path="suggestions" type="any[]">
+  Suggested users for friend connections (up to 10 random clients)
+</ParamField>
+
+<ParamField path="searchResults" type="any[]">
+  Users matching the search query (filtered by username, up to 5 results)
+</ParamField>
+
+<ParamField path="loading" type="boolean">
+  Loading state for async operations
+</ParamField>
+
+## Functions
+
+### fetchFriends
+
+Loads all accepted friends for the current user.
+
+```typescript
+const fetchFriends = async () => Promise<void>
+```
+
+**Implementation:**
+- Queries `friend_requests` collection for accepted relationships
+- Fetches user data for each friend ID
+- Updates `friends` state with complete user objects
+
+**Example:**
+```typescript
+useEffect(() => {
+  fetchFriends();
+}, []);
+```
+
+---
+
+### fetchRequests
+
+Loads incoming and outgoing friend requests.
+
+```typescript
+const fetchRequests = async () => Promise<void>
+```
+
+**Behavior:**
+- Incoming requests → `requests` state (with sender data)
+- Outgoing requests → `sentRequests` state (user IDs only)
+
+---
+
+### searchUsers
+
+Searches for users by username with debouncing (500ms delay).
+
+```typescript
+const searchUsers = (text: string) => void
+```
+
+<ParamField path="text" type="string" required>
+  Search query (username prefix)
+</ParamField>
+
+**Features:**
+- Prefix search using Firestore `>=` and `<=` operators
+- Filters out current user and non-clients
+- Limits results to 5 users
+- Automatic debouncing to prevent excessive queries
+
+<Warning>
+This query requires a composite index in Firestore on the `users` collection:
+- Field 1: `role` (Ascending)
+- Field 2: `username` (Ascending)
+
+Firebase will prompt you to create this index when first used.
+</Warning>
+
+**Example:**
+```typescript
+<TextInput
+  value={searchText}
+  onChangeText={searchUsers}
+  placeholder="Buscar por username"
+/>
+```
+
+---
+
+### fetchSuggestions
+
+Gets random user suggestions (clients only).
+
+```typescript
+const fetchSuggestions = async () => Promise<void>
+```
+
+Returns up to 10 users with `role: "client"`, excluding the current user.
+
+---
+
+### sendFriendRequest
+
+Sends a friend request to another user.
+
+```typescript
+const sendFriendRequest = async (toUserId: string, toUsername: string) => Promise<void>
+```
+
+<ParamField path="toUserId" type="string" required>
+  Target user's Firebase UID
+</ParamField>
+
+<ParamField path="toUsername" type="string" required>
+  Target user's username (for display in alerts)
+</ParamField>
+
+**Behavior:**
+- Checks for existing requests or friendships
+- Creates `friend_requests` document with `status: "pending"`
+- Awards 50 XP to both users (sender and recipient)
+- Shows success/error alerts
+
+**Friend Request Schema:**
+```typescript
+interface FriendRequest {
+  fromId: string;
+  toId: string;
+  status: 'pending' | 'accepted' | 'rejected';
+  createdAt: Timestamp;
+}
+```
+
+---
+
+### acceptRequest
+
+Accepts an incoming friend request.
+
+```typescript
+const acceptRequest = async (requestId: string) => Promise<void>
+```
+
+<ParamField path="requestId" type="string" required>
+  Document ID of the friend request in Firestore
+</ParamField>
+
+**Actions:**
+- Updates request status to `"accepted"`
+- Awards additional 50 XP to both users
+- Refreshes friend list and requests
+- Shows success alert
+
+<Tip>
+Total XP from friend connection: 100 XP (50 on request + 50 on accept) for both users.
+</Tip>
+
+---
+
+### rejectRequest
+
+Rejects an incoming friend request.
+
+```typescript
+const rejectRequest = async (requestId: string) => Promise<void>
+```
+
+**Behavior:**
+- Updates status to `"rejected"` (keeps record for analytics)
+- Removes from requests list
+- Shows confirmation alert
+
+---
+
+### removeFriend
+
+Removes an existing friendship (bi-directional).
+
+```typescript
+const removeFriend = async (friendId: string) => Promise<void>
+```
+
+<ParamField path="friendId" type="string" required>
+  User ID of the friend to remove
+</ParamField>
+
+**Process:**
+1. Shows confirmation dialog
+2. Finds the accepted `friend_requests` document
+3. Deletes the document from Firestore
+4. Refreshes friend list
+5. Shows success alert
+
+<Warning>
+This action is permanent and cannot be undone. Users must send a new friend request to reconnect.
+</Warning>
+
+---
+
+### refreshAll
+
+Convenience function to reload all data.
+
+```typescript
+const refreshAll = async () => Promise<void>
+```
+
+Calls `fetchFriends()`, `fetchRequests()`, and `fetchSuggestions()` in sequence.
+
+## Complete Example
+
+```typescript AmigosScreen.tsx
+import { useAmigos } from '@/hooks/useAmigos';
+import { useState } from 'react';
+
+export default function AmigosScreen() {
+  const {
+    friends,
+    requests,
+    searchResults,
+    loading,
+    searchUsers,
+    sendFriendRequest,
+    acceptRequest,
+    removeFriend,
+    refreshAll
+  } = useAmigos();
+  
+  const [searchText, setSearchText] = useState('');
+  const [activeTab, setActiveTab] = useState<'friends' | 'requests' | 'search'>('friends');
+
+  return (
+    <View>
+      {/* Friends Tab */}
+      {activeTab === 'friends' && (
+        <FlatList
+          data={friends}
+          renderItem={({ item }) => (
+            <FriendCard
+              friend={item}
+              onRemove={() => removeFriend(item.id)}
+            />
+          )}
+          refreshing={loading}
+          onRefresh={refreshAll}
+        />
+      )}
+      
+      {/* Requests Tab */}
+      {activeTab === 'requests' && (
+        <FlatList
+          data={requests}
+          renderItem={({ item }) => (
+            <RequestCard
+              request={item}
+              onAccept={() => acceptRequest(item.requestId)}
+              onReject={() => rejectRequest(item.requestId)}
+            />
+          )}
+        />
+      )}
+      
+      {/* Search Tab */}
+      {activeTab === 'search' && (
+        <>
+          <TextInput
+            value={searchText}
+            onChangeText={(text) => {
+              setSearchText(text);
+              searchUsers(text);
+            }}
+            placeholder="Buscar por username"
+          />
+          <FlatList
+            data={searchResults}
+            renderItem={({ item }) => (
+              <UserCard
+                user={item}
+                onAdd={() => sendFriendRequest(item.id, item.username)}
+              />
+            )}
+          />
+        </>
+      )}
+    </View>
+  );
+}
+```
+
+## Firebase Structure
+
+### friend_requests Collection
+
+```typescript
+{
+  "friend_requests": {
+    "[requestId]": {
+      "fromId": "user123",
+      "toId": "user456",
+      "status": "pending" | "accepted" | "rejected",
+      "createdAt": Timestamp
+    }
+  }
+}
+```
+
+### users Collection (relevant fields)
+
+```typescript
+{
+  "users": {
+    "[uid]": {
+      "username": "juanp",
+      "nombres": "Juan",
+      "apellidos": "Pérez",
+      "photoURL": "https://...",
+      "role": "client",
+      "xp": 350
+    }
+  }
+}
+```
+
+## XP Rewards
+
+Friend interactions award experience points:
+
+| Action | XP Awarded | Recipient |
+|--------|------------|-----------|
+| Send request | 50 | Both users |
+| Accept request | 50 | Both users |
+| **Total per friendship** | **100** | **Each user** |
+
+## Performance Considerations
+
+- **Debounced search**: 500ms delay prevents excessive Firestore queries
+- **Firestore indexes**: Required for username prefix search
+- **Batch queries**: Friends fetched with `Promise.all` for parallel loading
+- **Filtered suggestions**: Role-based filtering reduces unnecessary data transfer
+
+## Related
+
+- [Community Friends Guide](/community/friends) - User-facing friend system documentation
+- [Community Ranking](/community/ranking) - XP and leaderboard system
+- [User Profile Feature](/features/user-profile) - Profile data structure

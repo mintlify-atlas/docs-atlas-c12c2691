@@ -55,7 +55,9 @@
               "guides/managing-vehicles",
               "guides/payment-methods",
               "guides/history-tracking",
-              "guides/support-chat"
+              "guides/support-chat",
+              "guides/security-settings",
+              "guides/terms-and-privacy"
             ]
           },
           {
@@ -94,7 +96,9 @@
               "development/hooks/use-login",
               "development/hooks/use-historial",
               "development/hooks/use-tarjetas",
-              "development/hooks/use-support-chat"
+              "development/hooks/use-support-chat",
+              "development/hooks/use-amigos",
+              "development/hooks/use-seguridad"
             ]
           }
         ]

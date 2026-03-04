@@ -1,0 +1,248 @@
+---
+title: Security settings
+description: Manage your account security with PIN, biometric authentication, and password changes
+icon: "shield-halved"
+---
+
+Protect your PARKINMX account with multiple layers of security including a 4-digit PIN, biometric authentication, and password management.
+
+## Overview
+
+PARKINMX provides three security features:
+
+1. **Security PIN (NIP)** - 4-digit code for sensitive operations
+2. **Biometric Authentication** - Face ID, Touch ID, or Fingerprint for quick login
+3. **Password Management** - Change your login password
+
+<Info>
+Access security settings from **Perfil → Seguridad** in the side menu.
+</Info>
+
+## Security PIN (NIP)
+
+The security PIN is a 4-digit code used to authorize sensitive operations like:
+- Creating payment cards
+- Confirming reservations
+- Modifying account settings
+
+### Creating Your First PIN
+
+<Steps>
+  <Step title="Navigate to Security">
+    Open the side menu and tap **Perfil → Seguridad**.
+  </Step>
+  
+  <Step title="Verify your email">
+    - Tap **"Enviar Código"** to receive a 6-digit code via email
+    - Enter the code when it arrives
+    - Tap **"Verificar"** to continue
+  </Step>
+  
+  <Step title="Create your PIN">
+    - Use the numeric keypad to enter a 4-digit PIN
+    - Choose a memorable but secure combination
+    - Avoid obvious patterns like 1234 or 0000
+  </Step>
+  
+  <Step title="Confirm your PIN">
+    - Re-enter the same 4-digit PIN
+    - If they match, your PIN is saved
+    - If not, you'll be prompted to try again
+  </Step>
+</Steps>
+
+<Warning>
+**Write down your PIN** in a secure location. If you forget it, you'll need to go through email verification to reset it.
+</Warning>
+
+### Changing Your PIN
+
+1. Go to **Seguridad → Cambiar mi NIP**
+2. Verify your email (6-digit code)
+3. Enter your new 4-digit PIN
+4. Confirm the new PIN
+5. Your PIN is immediately updated
+
+<Tip>
+Change your PIN regularly (every 3-6 months) for enhanced security.
+</Tip>
+
+### Recovering a Forgotten PIN
+
+If you forget your PIN:
+
+1. Tap **"¿Olvidaste tu NIP?"** on any PIN entry screen
+2. Verify your email address
+3. Create a new PIN following the standard flow
+4. The old PIN is replaced
+
+## Biometric Authentication
+
+Speed up your login with facial or fingerprint recognition.
+
+### Supported Methods
+
+| Platform | Method | Requirements |
+|----------|--------|-------------|
+| iOS | Face ID | iPhone X or newer |
+| iOS | Touch ID | iPhone 5s - 8 Plus, iPad |
+| Android | Fingerprint | Android 6.0+, enrolled fingerprint |
+
+### Enabling Biometrics
+
+<Steps>
+  <Step title="Check compatibility">
+    Your device must have biometric hardware and at least one face/fingerprint enrolled in system settings.
+  </Step>
+  
+  <Step title="Enable in app">
+    1. Go to **Seguridad**
+    2. Toggle **"Usar Face ID"** or **"Usar Huella Digital"**
+    3. Authenticate with your face/fingerprint when prompted
+    4. Toggle turns green when enabled
+  </Step>
+  
+  <Step title="Test it">
+    1. Log out of the app
+    2. On the login screen, tap the biometric icon
+    3. Authenticate with your face/fingerprint
+    4. You're logged in instantly
+  </Step>
+</Steps>
+
+<Info>
+Biometric data **never leaves your device**. Authentication is processed locally by iOS/Android, and PARKINMX only receives a success/failure response.
+</Info>
+
+### Disabling Biometrics
+
+1. Go to **Seguridad**
+2. Toggle **"Usar Face ID"** or **"Usar Huella Digital"** to off
+3. No authentication required to disable
+
+You'll need to use your email/password to log in after disabling.
+
+## Password Management
+
+Change your Firebase Authentication password directly from the app.
+
+### Changing Your Password
+
+<Steps>
+  <Step title="Verify with PIN">
+    1. Tap **"Cambiar Contraseña"** in Security menu
+    2. Enter your 4-digit security PIN
+    3. If correct, password form appears
+  </Step>
+  
+  <Step title="Enter new password">
+    1. Type your new password (minimum 6 characters)
+    2. Use a mix of letters, numbers, and symbols
+    3. Tap **"Actualizar Contraseña"**
+  </Step>
+  
+  <Step title="Confirmation">
+    Success alert appears. Your new password is active immediately.
+  </Step>
+</Steps>
+
+<Warning>
+**Important:** You must use the new password on your next login. If you forget it, use the **"¿Olvidaste tu contraseña?"** option on the login screen.
+</Warning>
+
+### Password Requirements
+
+- Minimum 6 characters
+- Case-sensitive
+- Can include letters, numbers, and special characters
+- No maximum length
+
+<Tip>
+**Strong password tips:**
+- Use a passphrase (e.g., "MyParking2024!")
+- Avoid personal information (birthdays, names)
+- Don't reuse passwords from other accounts
+- Consider using a password manager
+</Tip>
+
+### Session Timeout
+
+If your Firebase session is too old, password changes may fail with:
+
+```
+Error: "No se pudo actualizar. Es posible que debas iniciar sesión nuevamente."
+```
+
+**Solution:**
+1. Log out of the app
+2. Log back in with your current password
+3. Immediately go to Security and change your password
+
+## Security Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Use Biometrics" icon="fingerprint">
+    Enable Face ID or Fingerprint for quick, secure access without typing passwords.
+  </Card>
+  
+  <Card title="Strong PIN" icon="key">
+    Avoid 1234, 0000, or your birthday. Use a random 4-digit combination.
+  </Card>
+  
+  <Card title="Regular Updates" icon="rotate">
+    Change your PIN and password every 3-6 months.
+  </Card>
+  
+  <Card title="Secure Device" icon="mobile">
+    Always lock your phone with a passcode. PARKINMX security is only as strong as your device lock.
+  </Card>
+</CardGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Biometric toggle is grayed out">
+    **Causes:**
+    - Device doesn't have biometric hardware
+    - No face/fingerprint enrolled in system settings
+    - Permission denied to app
+    
+    **Solution:**
+    - iOS: Settings → Face ID & Passcode (or Touch ID)
+    - Android: Settings → Security → Fingerprint
+    - Enroll at least one face/fingerprint
+    - Restart the app
+  </Accordion>
+  
+  <Accordion title="Email verification code not arriving">
+    **Troubleshooting steps:**
+    1. Check spam/junk folder
+    2. Wait 2-3 minutes (email can be delayed)
+    3. Verify email address is correct in your profile
+    4. Tap **"Enviar Código"** again to resend
+    5. If still failing, contact support
+  </Accordion>
+  
+  <Accordion title="Forgot both PIN and password">
+    **Recovery process:**
+    1. Use **"¿Olvidaste tu contraseña?"** on login screen first
+    2. Reset password via Firebase email link
+    3. Log in with new password
+    4. Go to Security and recover PIN via email verification
+  </Accordion>
+  
+  <Accordion title="PIN not working in other parts of the app">
+    **Common issue:** Typing too fast or extra spaces
+    
+    **Solution:**
+    - Enter PIN slowly, one digit at a time
+    - Use delete (⌫) to clear and re-enter
+    - If persistently failing, change your PIN to a new one
+  </Accordion>
+</AccordionGroup>
+
+## Related
+
+- [User Profile](/features/user-profile) - Account information
+- [Payment Methods](/guides/payment-methods) - PIN required for adding cards
+- [useSeguridad Hook](/development/hooks/use-seguridad) - Technical implementation
