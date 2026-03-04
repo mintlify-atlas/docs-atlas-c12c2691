@@ -1,0 +1,112 @@
+{
+  "projectType": "saas",
+  "projectName": "PARKINMX",
+  "projectDescription": "A mobile parking reservation platform that enables users to find, reserve, and manage parking spots with real-time availability and digital payments.",
+  "theme": "almond",
+  "primaryColor": "#7c7c7c",
+  "lightColor": "#0a0a0a",
+  "darkColor": "#c9c9c9",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Getting Started",
+            "pages": [
+              "introduction",
+              "quickstart",
+              "installation"
+            ]
+          },
+          {
+            "group": "Core Features",
+            "pages": [
+              "features/reservations",
+              "features/parking-map",
+              "features/user-profile",
+              "features/wallet-payments",
+              "features/vehicles",
+              "features/qr-tickets",
+              "features/notifications"
+            ]
+          },
+          {
+            "group": "User Guides",
+            "pages": [
+              "guides/making-reservation",
+              "guides/managing-vehicles",
+              "guides/payment-methods",
+              "guides/history-tracking",
+              "guides/support-chat"
+            ]
+          },
+          {
+            "group": "Community",
+            "pages": [
+              "community/friends",
+              "community/ranking"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Development",
+        "groups": [
+          {
+            "group": "Architecture",
+            "pages": [
+              "development/architecture",
+              "development/firebase-setup",
+              "development/expo-configuration"
+            ]
+          },
+          {
+            "group": "Components",
+            "pages": [
+              "development/components/parking-map",
+              "development/components/ticket-modal",
+              "development/components/scanner-modal",
+              "development/components/qr-modal"
+            ]
+          },
+          {
+            "group": "Hooks",
+            "pages": [
+              "development/hooks/use-reservar",
+              "development/hooks/use-login",
+              "development/hooks/use-historial",
+              "development/hooks/use-tarjetas",
+              "development/hooks/use-support-chat"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Real-time parking spot availability with interactive map",
+    "Secure user authentication and profile management",
+    "Digital wallet with credit balance and payment processing",
+    "QR code ticket generation and scanning",
+    "Push notifications for reservation updates",
+    "Vehicle management system",
+    "Reservation history and tracking",
+    "Community features with friends and ranking",
+    "AI-powered support chat",
+    "Multi-platform support (iOS, Android, Web)"
+  ],
+  "publicApiSurface": [
+    "useReservar - Reservation creation and management hook",
+    "useLogin - Authentication and session management hook",
+    "useHistorial - Reservation history retrieval hook",
+    "useTarjetas - Payment card management hook",
+    "useSupportChat - AI support chat integration hook",
+    "useAmigos - Friend management and social features hook",
+    "useSeguridad - Security settings and biometric authentication hook",
+    "ParkingMap - Interactive parking lot visualization component",
+    "TicketModal - QR ticket display and management component",
+    "ScannerModal - QR code scanning component",
+    "MyQRModal - Personal QR code display component"
+  ]
+}
